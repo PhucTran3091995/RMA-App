@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import type { Role } from '../store/authStore';
 import { Lock, User, Shield } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
     const navigate = useNavigate();
-    const location = useLocation();
     const { login, isAuthenticated } = useAuthStore();
 
     const [email, setEmail] = useState('');
@@ -51,8 +50,8 @@ const LoginPage: React.FC = () => {
         <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
             <div className="max-w-md w-full bg-white rounded-lg shadow-md overflow-hidden">
                 <div className="bg-blue-600 p-6 text-center">
-                    <h1 className="text-2xl font-bold text-white">RMA Console</h1>
-                    <p className="text-blue-100 mt-2">Sign in to your account</p>
+                    <h1 className="text-2xl font-bold text-white">RMA APP</h1>
+                    <p className="text-blue-100 mt-2">Please enter your credentials</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-6">
@@ -73,7 +72,7 @@ const LoginPage: React.FC = () => {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="you@example.com"
+                                placeholder=""
                             />
                         </div>
                     </div>
@@ -89,7 +88,7 @@ const LoginPage: React.FC = () => {
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="��������"
+                                placeholder="••••••••"
                             />
                         </div>
                     </div>

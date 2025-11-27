@@ -1,5 +1,3 @@
-import { useState, useEffect } from 'react';
-
 // Mock data types
 export interface RmaStats {
     total: number;

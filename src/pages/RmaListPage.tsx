@@ -6,10 +6,10 @@ import {
     Filter,
     ChevronLeft,
     ChevronRight,
-    Eye,
-    Edit
+    Eye
 } from 'lucide-react';
-import { getRmas, Rma } from '../api/mockApi';
+import { getRmas } from '../api/mockApi';
+import type { Rma } from '../api/mockApi';
 import { clsx } from 'clsx';
 
 const RmaListPage: React.FC = () => {

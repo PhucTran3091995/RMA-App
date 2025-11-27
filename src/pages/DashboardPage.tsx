@@ -5,10 +5,10 @@ import {
     AlertCircle,
     CheckCircle,
     Clock,
-    Package,
     TrendingUp
 } from 'lucide-react';
-import { getRmaStats, getRmaStatsByDate, RmaStats, ChartData } from '../api/mockApi';
+import { getRmaStats, getRmaStatsByDate } from '../api/mockApi';
+import type { ChartData, RmaStats } from '../api/mockApi';
 
 const DashboardPage: React.FC = () => {
     const navigate = useNavigate();

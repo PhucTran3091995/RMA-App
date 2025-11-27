@@ -4,12 +4,13 @@ import {
     ArrowLeft,
     Save,
     AlertTriangle,
-    Check,
     FileText,
     Wrench,
-    History
+    History,
+    Plus
 } from 'lucide-react';
-import { getRmaById, createRma, updateRma, Rma } from '../api/mockApi';
+import { getRmaById, createRma, updateRma } from '../api/mockApi';
+import type { Rma } from '../api/mockApi';
 import { clsx } from 'clsx';
 
 const RmaFormPage: React.FC = () => {

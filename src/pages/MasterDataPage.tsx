@@ -6,7 +6,6 @@ import {
     Plus,
     Edit2,
     Trash2,
-    Search,
     X
 } from 'lucide-react';
 import { clsx } from 'clsx';

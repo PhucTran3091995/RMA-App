@@ -1,11 +1,16 @@
 {
   "ExpandedNodes": [
     "",
-    "\\src",
-    "\\src\\api",
-    "\\src\\components",
-    "\\src\\pages"
+    "\\rma-app",
+    "\\rma-app\\src",
+    "\\rma-app\\src\\api",
+    "\\rma-app\\src\\assets",
+    "\\rma-app\\src\\components",
+    "\\rma-app\\src\\layouts",
+    "\\rma-app\\src\\pages",
+    "\\rma-backend",
+    "\\rma-backend\\routes"
   ],
-  "SelectedNode": "\\src\\main.tsx",
+  "SelectedNode": "\\rma-app\\src\\pages\\LoginPage.tsx",
   "PreviewInSolutionExplorer": false
 }

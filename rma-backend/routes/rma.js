@@ -26,7 +26,14 @@ function mapRmaRow(row) {
  */
 router.get('/', async (req, res) => {
     try {
-        let { page = 1, limit = 10, search = '', status = '' } = req.query;
+        let {
+            page = 1,
+            limit = 10,
+            search = '',
+            status = '',
+            startDate = '',
+            endDate = '',
+        } = req.query;
         page = parseInt(page, 10);
         limit = parseInt(limit, 10);
         const offset = (page - 1) * limit;
@@ -34,16 +41,35 @@ router.get('/', async (req, res) => {
         const params = [];
         let where = 'WHERE 1=1';
 
-        if (search) {
+        const normalizedSearch = search.trim().toLowerCase();
+
+        if (normalizedSearch) {
             where += `
-        AND (
-          rb.main_pid LIKE ? OR
-          rb.main_part_number LIKE ? OR
-          b.name LIKE ? OR
-          m.name LIKE ?
-        )`;
-            const like = `%${search}%`;
-            params.push(like, like, like, like);
+              AND (
+                LOWER(rb.main_work_order) LIKE ? OR
+                LOWER(rb.main_pid) LIKE ? OR
+                LOWER(rb.main_part_number) LIKE ? OR
+                LOWER(b.name) LIKE ? OR
+                LOWER(m.name) LIKE ? OR
+                LOWER(brd.name) LIKE ? OR
+                LOWER(rb.face) LIKE ? OR
+                LOWER(rb.defect_symptom_raw) LIKE ? OR
+                DATE_FORMAT(rb.rma_date, '%Y-%m-%d') LIKE ?
+              )`;
+            const like = `%${normalizedSearch}%`;
+            params.push(like, like, like, like, like, like, like, like, like);
+        }
+
+
+
+        if (startDate) {
+            where += ' AND rb.rma_date >= ?';
+            params.push(startDate);
+        }
+
+        if (endDate) {
+            where += ' AND rb.rma_date <= ?';
+            params.push(endDate);
         }
 
         if (status && status !== 'All') {
@@ -59,6 +85,7 @@ router.get('/', async (req, res) => {
       FROM rma_boards rb
       LEFT JOIN buyers b ON rb.buyer_id = b.id
       LEFT JOIN models m ON rb.model_id = m.id
+      LEFT JOIN boards brd ON rb.board_id = brd.id
       ${where}
       `,
             params

@@ -11,6 +11,21 @@ const api = axios.create({
 
 export type RmaStatus = "IN" | "OUT" | "Processing" | string;
 
+export interface ChartData {
+    date: string;
+    count: number;
+}
+
+export interface DistributionData {
+    label: string;
+    value: number;
+}
+
+export interface DashboardDistributions {
+    byBuyer: DistributionData[];
+    byModel: DistributionData[];
+    byDefect: DistributionData[];
+}
 // rmaApi.ts
 
 export interface RmaDto {
@@ -47,6 +62,8 @@ export async function fetchRmas(params: {
     limit: number;
     search?: string;
     status?: string;
+    startDate?: string;
+    endDate?: string;
 }) {
     const res = await api.get("/rmas", { params });
     return res.data as {
@@ -57,9 +74,37 @@ export async function fetchRmas(params: {
     };
 }
 
+export interface TrendsBreakdown {
+    monthly: ChartData[];
+    weekly: ChartData[];
+    daily: ChartData[];
+}
+
+export interface ModelBreakdown {
+    model: string;
+    value: number;
+}
+
+// Interface cho cấu trúc Buyer cha
+export interface BuyerDistribution {
+    buyer: string;
+    total: number;
+    models: ModelBreakdown[];
+}
+
+export interface DashboardDistributions {
+    buyerBreakdown: BuyerDistribution[]; // Dữ liệu gộp mới
+    byDefect: { label: string; value: number }[];
+}
+
 export async function fetchRmaById(id: string): Promise<RmaDetailDto> {
     const res = await api.get(`/rmas/${id}`);
     return res.data as RmaDetailDto;
+}
+
+export async function getDashboardDistributions() {
+    const res = await api.get("/dashboard/distributions");
+    return res.data as DashboardDistributions;
 }
 
 export async function createRma(payload: {
@@ -90,15 +135,15 @@ export async function updateRmaApi(
 }
 
 // Dashboard
+
 export async function getRmaStats() {
     const res = await api.get("/dashboard/summary");
-    return res.data as {
-        total: number;
-        open: number;
-        in_progress: number;
-        closed: number;
-        pending: number;
-    };
+    return res.data;
+}
+
+export async function getProcessingTrend() {
+    const res = await api.get("/dashboard/trend-processing");
+    return res.data as ChartData[];
 }
 
 export async function getRmaStatsByDate(range: "7d" | "30d" | "90d") {
@@ -120,4 +165,19 @@ export async function fetchMasterCustomers() {
 export async function fetchMasterFaultCodes() {
     const res = await api.get("/masters/fault-codes");
     return res.data;
+}
+
+export async function validateRmaSerials(serials: string[]) {
+    const res = await api.post("/rmas/validate", { serials });
+    return res.data as RmaDto[];
+}
+
+export async function confirmClearanceApi(ids: number[]) {
+    const res = await api.post("/rmas/confirm-clear", { ids });
+    return res.data;
+}
+
+export async function getTrendsBreakdown() {
+    const res = await api.get("/dashboard/trends-breakdown");
+    return res.data as TrendsBreakdown;
 }

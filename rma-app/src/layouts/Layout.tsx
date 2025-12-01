@@ -1,21 +1,22 @@
 import React from 'react';
-import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { 
   LayoutDashboard, 
   ClipboardList, 
   Database, 
   LogOut, 
-  User as UserIcon,
   Menu,
-  X
+  X,
+  CheckSquare,
+  ArrowRightLeft,
+  Users // Icon mới cho trang Quản trị User
 } from 'lucide-react';
-import  clsx  from 'clsx';
+import clsx from 'clsx';
 
 const Layout: React.FC = () => {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
-  const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
   const handleLogout = () => {
@@ -23,99 +24,153 @@ const Layout: React.FC = () => {
     navigate('/login');
   };
 
+  // Định nghĩa menu với quyền truy cập (roles)
   const navItems = [
-    { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'agent'] },
-    { path: '/rmas', label: 'RMA List', icon: ClipboardList, roles: ['admin', 'agent'] },
-    { path: '/master-data', label: 'Master Data', icon: Database, roles: ['admin'] },
+    // 1. Dashboard: Ai cũng xem được
+    { 
+      path: '/', 
+      label: 'Dashboard', 
+      icon: LayoutDashboard, 
+      roles: ['admin', 'sub_admin', 'user'] 
+    },
+    // 2. RMA List: Ai cũng xem được
+    { 
+      path: '/rmas', 
+      label: 'RMA list', 
+      icon: ClipboardList, 
+      roles: ['admin', 'sub_admin', 'user'] 
+    },
+    // 3. Loans: Ai cũng xem được (nhưng quyền sửa xóa sẽ chặn bên trong trang)
+    { 
+      path: '/loans', 
+      label: 'Loans', 
+      icon: ArrowRightLeft, 
+      roles: ['admin', 'sub_admin', 'user'] 
+    },
+    // 4. Clear Hàng: Chỉ Admin và SubAdmin
+    { 
+      path: '/clearance', 
+      label: 'Clear Hàng', 
+      icon: CheckSquare, 
+      roles: ['admin', 'sub_admin'] 
+    },
+    // 5. Master Data: Chỉ Admin và SubAdmin
+    { 
+      path: '/master-data', 
+      label: 'Master Data', 
+      icon: Database, 
+      roles: ['admin', 'sub_admin'] 
+    },
+    // 6. Quản trị User: CHỈ ADMIN
+    { 
+      path: '/users', 
+      label: 'Quản trị User', 
+      icon: Users, 
+      roles: ['admin'] 
+    },
   ];
 
-  const filteredNavItems = navItems.filter(item => 
-    user && item.roles.includes(user.role)
-  );
+  // Helper để lấy màu badge cho Role
+  const getRoleBadgeColor = (role?: string) => {
+    switch (role) {
+      case 'admin': return 'bg-purple-100 text-purple-800';
+      case 'sub_admin': return 'bg-blue-100 text-blue-800';
+      default: return 'bg-green-100 text-green-800'; // user
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
-      {/* Mobile Header */}
-      <div className="md:hidden bg-white border-b p-4 flex items-center justify-between">
-        <div className="font-bold text-xl text-blue-600">RMA Console</div>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-          {isMobileMenuOpen ? <X /> : <Menu />}
+    <div className="flex h-screen bg-gray-100">
+      {/* Mobile menu button */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b px-4 py-2 flex items-center justify-between">
+        <span className="font-bold text-xl text-blue-900">RMA System</span>
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
+        >
+          {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </button>
       </div>
 
-      {/* Sidebar */}
-      <aside className={clsx(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-white border-r transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0",
-        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
-        <div className="h-full flex flex-col">
-          <div className="p-6 border-b hidden md:block">
-            <h1 className="text-2xl font-bold text-blue-600">RMA Application</h1>
+      {/* Sidebar Navigation */}
+      <aside 
+        className={clsx(
+          "fixed inset-y-0 left-0 z-40 w-64 bg-blue-900 text-white transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:inset-auto",
+          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        <div className="flex flex-col h-full">
+          {/* Logo Area */}
+          <div className="flex items-center justify-center h-16 border-b border-blue-800 bg-blue-950">
+            <h1 className="text-xl font-bold tracking-wider">RMA APP</h1>
           </div>
 
-          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-            {filteredNavItems.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className={({ isActive }) => clsx(
-                  "flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors",
-                  isActive 
-                    ? "bg-blue-50 text-blue-700" 
-                    : "text-gray-700 hover:bg-gray-100"
-                )}
-              >
-                <item.icon className="mr-3 h-5 w-5" />
-                {item.label}
-              </NavLink>
+          {/* Navigation Links */}
+          <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
+            {navItems
+              // LỌC MENU DỰA TRÊN ROLE
+              .filter(item => user?.role && item.roles.includes(user.role))
+              .map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => setIsMobileMenuOpen(false)} // Đóng menu mobile khi click
+                  className={({ isActive }) =>
+                    clsx(
+                      isActive
+                        ? 'bg-blue-800 text-white'
+                        : 'text-blue-100 hover:bg-blue-800 hover:text-white',
+                      'group flex items-center px-2 py-2 text-base font-medium rounded-md transition-colors'
+                    )
+                  }
+                >
+                  <item.icon className="mr-4 h-6 w-6 flex-shrink-0" aria-hidden="true" />
+                  {item.label}
+                </NavLink>
             ))}
           </nav>
 
-          <div className="p-4 border-t bg-gray-50">
+          {/* User Profile Section */}
+          <div className="border-t border-blue-800 p-4 bg-blue-950">
             <div className="flex items-center mb-4">
-              <div className="bg-blue-100 p-2 rounded-full">
-                <UserIcon className="h-5 w-5 text-blue-600" />
+              <div className="h-9 w-9 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
+                {user?.name?.charAt(0).toUpperCase() || 'U'}
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-900 truncate max-w-[140px]">
-                  {user?.email}
+                <p className="text-sm font-medium text-white truncate max-w-[140px]">
+                  {user?.name || 'User'}
                 </p>
                 <span className={clsx(
-                  "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium",
-                  user?.role === 'admin' ? "bg-purple-100 text-purple-800" : "bg-green-100 text-green-800"
+                  "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium mt-1",
+                  getRoleBadgeColor(user?.role)
                 )}>
-                  {user?.role.toUpperCase()}
+                  {user?.role?.toUpperCase() || 'GUEST'}
                 </span>
               </div>
             </div>
+            
             <button
               onClick={handleLogout}
-              className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="w-full flex items-center justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
             >
               <LogOut className="mr-2 h-4 w-4" />
-              Sign Out
+              Đăng xuất
             </button>
           </div>
         </div>
       </aside>
 
-      {/* Overlay for mobile */}
+      {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+          className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-auto">
-        <header className="bg-white shadow-sm sticky top-0 z-30 px-6 py-4 hidden md:block">
-          <h2 className="text-xl font-semibold text-gray-800">
-            {navItems.find(item => item.path === location.pathname)?.label || 'RMA Console'}
-          </h2>
-        </header>
-        <div className="p-6">
+      {/* Main Content Area */}
+      <main className="flex-1 overflow-auto md:pt-0 pt-16">
+        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <Outlet />
         </div>
       </main>

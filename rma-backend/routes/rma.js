@@ -392,4 +392,76 @@ router.put('/:id', async (req, res) => {
     }
 });
 
+router.post('/validate', async (req, res) => {
+    try {
+        const { serials } = req.body;
+
+        if (!serials || !Array.isArray(serials) || serials.length === 0) {
+            return res.json([]);
+        }
+
+        // Tạo chuỗi dấu ? cho câu lệnh SQL IN (...)
+        const placeholders = serials.map(() => '?').join(',');
+
+        const [rows] = await pool.query(
+            `
+            SELECT
+                rb.id,
+                rb.main_pid,
+                rb.status_actual,
+                rb.rma_date,
+                m.name AS model_name,
+                b.name AS buyer_name
+            FROM rma_boards rb
+            LEFT JOIN models m ON rb.model_id = m.id
+            LEFT JOIN buyers b ON rb.buyer_id = b.id
+            WHERE rb.main_pid IN (${placeholders})
+            `,
+            serials
+        );
+
+        // Map data trả về format giống frontend
+        const result = rows.map(row => ({
+            id: row.id,
+            serial: row.main_pid,
+            model: row.model_name,
+            customer: row.buyer_name,
+            status: row.status_actual,
+            createdDate: new Date(row.rma_date).toISOString().split('T')[0]
+        }));
+
+        res.json(result);
+    } catch (err) {
+        console.error('POST /api/rmas/validate error', err);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+router.post('/confirm-clear', async (req, res) => {
+    try {
+        const { ids } = req.body;
+
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ message: 'No IDs provided' });
+        }
+
+        const placeholders = ids.map(() => '?').join(',');
+
+        const sql = `
+            UPDATE rma_boards 
+            SET status_actual = 'OUT', clear_date = CURDATE() 
+            WHERE id IN (${placeholders})
+        `;
+
+        await pool.query(sql, ids);
+
+        res.json({ message: 'Cleared successfully', count: ids.length });
+    } catch (err) {
+        console.error('POST /api/rmas/confirm-clear error', err);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+
+
 module.exports = router;

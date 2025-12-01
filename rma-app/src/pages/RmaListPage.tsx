@@ -1,12 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-    Plus,
-    Search,
-    Filter,
-    ChevronLeft,
-    ChevronRight,
-    Eye
+    Plus, Search, Filter, ChevronLeft, ChevronRight, Eye, Download, Calendar
 } from 'lucide-react';
 import { fetchRmas, type RmaDto } from '../api/rmaApi';
 import { clsx } from 'clsx';
@@ -29,7 +24,6 @@ const RmaListPage: React.FC = () => {
     const [endDate, setEndDate] = useState(searchParams.get('endDate') || '');
     const limit = 10;
 
-    // Debounce search
     useEffect(() => {
         const timer = setTimeout(() => {
             const params: Record<string, string> = {
@@ -37,27 +31,19 @@ const RmaListPage: React.FC = () => {
                 status: status === 'All' ? '' : status,
                 page: page.toString(),
             };
-
             if (startDate) params.startDate = startDate;
             if (endDate) params.endDate = endDate;
-
             setSearchParams(params);
         }, 500);
         return () => clearTimeout(timer);
     }, [search, status, page, startDate, endDate, setSearchParams]);
 
-    // Fetch data
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             try {
                 const { data, total } = await fetchRmas({
-                    page,
-                    limit,
-                    search,
-                    status,
-                    startDate,
-                    endDate
+                    page, limit, search, status, startDate, endDate
                 });
                 setRmas(data);
                 setTotal(total);
@@ -67,7 +53,6 @@ const RmaListPage: React.FC = () => {
                 setLoading(false);
             }
         };
-
         fetchData();
     }, [page, search, status, startDate, endDate]);
 
@@ -75,34 +60,23 @@ const RmaListPage: React.FC = () => {
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'IN': return 'bg-blue-100 text-blue-800';
-            case 'Processing': return 'bg-yellow-100 text-yellow-800';
-            case 'OUT': return 'bg-green-100 text-green-800';
-            default: return 'bg-gray-100 text-gray-800';
+            case 'IN': return 'bg-blue-100 text-blue-700 border-blue-200';
+            case 'Processing': return 'bg-amber-100 text-amber-700 border-amber-200';
+            case 'OUT': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+            default: return 'bg-slate-100 text-slate-600 border-slate-200';
         }
     };
 
     const handleDownloadExcel = async () => {
         try {
             setExporting(true);
-
-            // Lấy tất cả kết quả theo filter hiện tại
-            // dùng limit = total, nếu total = 0 thì tránh gọi
             if (total === 0) {
                 alert('Không có dữ liệu để xuất Excel');
                 return;
             }
-
             const { data } = await fetchRmas({
-                page: 1,
-                limit: total,   // lấy hết bản ghi theo filter hiện tại
-                search,
-                status,
-                startDate,
-                endDate
+                page: 1, limit: total, search, status, startDate, endDate
             });
-
-            // Chuẩn bị dữ liệu cho Excel
             const rows = data.map((rma, index) => ({
                 'No.': index + 1,
                 'W/O Name': rma.rmaNo,
@@ -115,154 +89,139 @@ const RmaListPage: React.FC = () => {
                 'Face': rma.face ?? '',
                 'Defect Symptom': rma.defectSymptom ?? '',
             }));
-
             const worksheet = XLSX.utils.json_to_sheet(rows);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, 'RMA List');
-
-            // Tạo tên file theo filter ngày
-            const from = startDate || 'ALL';
-            const to = endDate || 'ALL';
-            const fileName = `RMA_List_${from}_to_${to}.xlsx`;
-
+            const fileName = `RMA_List_${startDate || 'ALL'}_to_${endDate || 'ALL'}.xlsx`;
             XLSX.writeFile(workbook, fileName);
         } catch (error) {
             console.error('Export Excel error', error);
-            alert('Có lỗi khi xuất Excel. Vui lòng thử lại.');
+            alert('Có lỗi khi xuất Excel.');
         } finally {
             setExporting(false);
         }
     };
 
-
-
     return (
-        <div className="space-y-6">
+        <div className="space-y-8 animate-fade-in">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <h1 className="text-2xl font-bold text-gray-900">RMA List</h1>
-                <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 border-b border-slate-200 pb-6">
+                <div>
+                    <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">RMA Management</h1>
+                    <p className="text-slate-500 mt-1">Quản lý danh sách và trạng thái.</p>
+                </div>
+                <div className="flex gap-3">
                     <button
                         onClick={handleDownloadExcel}
                         disabled={loading || exporting || total === 0}
-                        className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                        className="inline-flex items-center px-4 py-2.5 border border-slate-300 rounded-xl shadow-sm text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 hover:text-indigo-600 transition-all disabled:opacity-50"
                     >
                         {exporting ? (
-                            <span>Đang xuất...</span>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-600 mr-2"></div>
                         ) : (
-                            <span>Download Excel</span>
+                            <Download className="h-4 w-4 mr-2" />
                         )}
+                        Export Excel
                     </button>
                     <button
                         onClick={() => navigate('/rmas/new')}
-                        className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        className="inline-flex items-center px-5 py-2.5 border border-transparent rounded-xl shadow-lg shadow-indigo-200 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-all hover:scale-105 active:scale-95"
                     >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add
+                        <Plus className="h-5 w-5 mr-2" />
+                        Create New
                     </button>
                 </div>
             </div>
 
-
-            {/* Filters */}
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex flex-col sm:flex-row gap-4">
-                <div className="flex-1 relative">
+            {/* Filters Area */}
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                {/* Search */}
+                <div className="md:col-span-5 relative group">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Search className="h-5 w-5 text-gray-400" />
+                        <Search className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                     </div>
                     <input
                         type="text"
                         value={search}
-                        onChange={(e) => {
-                            setSearch(e.target.value);
-                            setPage(1); // Reset to page 1 on search
-                        }}
-                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                        placeholder="Search RMA No, Customer, Serial, Model..."
+                        onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                        className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl leading-5 bg-slate-50 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 sm:text-sm transition-all"
+                        placeholder="Search everything..."
                     />
                 </div>
 
-                <div className="sm:w-48">
-                    <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <Filter className="h-5 w-5 text-gray-400" />
-                        </div>
-                        <select
-                            value={status}
-                            onChange={(e) => {
-                                setStatus(e.target.value);
-                                setPage(1);
-                            }}
-                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                        >
-                            <option value="All">Status (Actual)</option>
-                            <option value="IN">IN</option>
-                            <option value="Processing">Processing</option>
-                            <option value="OUT">OUT</option>
-                        </select>
+                {/* Status */}
+                <div className="md:col-span-3 relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Filter className="h-4 w-4 text-slate-400" />
+                    </div>
+                    <select
+                        value={status}
+                        onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+                        className="block w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 sm:text-sm appearance-none cursor-pointer transition-all"
+                    >
+                        <option value="All">All Status</option>
+                        <option value="IN">IN</option>
+                        <option value="Processing">Processing</option>
+                        <option value="OUT">OUT</option>
+                    </select>
+                </div>
 
+                {/* Date Range */}
+                <div className="md:col-span-4 flex gap-2">
+                    <div className="relative flex-1">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <Calendar className="h-4 w-4 text-slate-400" />
+                        </div>
+                        <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
+                            className="block w-full pl-9 px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 sm:text-sm transition-all"
+                        />
+                    </div>
+                    <div className="relative flex-1">
+                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <Calendar className="h-4 w-4 text-slate-400" />
+                        </div>
+                        <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
+                            className="block w-full pl-9 px-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 sm:text-sm transition-all"
+                        />
                     </div>
                 </div>
             </div>
 
-            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">RMA Date From</label>
-                    <input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => {
-                            setStartDate(e.target.value);
-                            setPage(1);
-                        }}
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    />
-                </div>
-                <div>
-                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">RMA Date To</label>
-                    <input
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => {
-                            setEndDate(e.target.value);
-                            setPage(1);
-                        }}
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    />
-                </div>
-            </div>
-
             {/* Table */}
-            <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
+            <div className="bg-white shadow-xl shadow-slate-200/60 rounded-2xl border border-slate-100 overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                    <table className="min-w-full divide-y divide-slate-100">
+                        <thead className="bg-slate-50/80">
                             <tr>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">W/O Name</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Buyer</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Model / PID</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RMA Date</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Board</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Face</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Defect Symptom</th>
-                                <th scope="col" className="relative px-6 py-3">
+                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">W/O Name</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Buyer</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Model / PID</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">RMA Input Date</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Details</th>
+                                <th className="px-6 py-4 relative">
                                     <span className="sr-only">Actions</span>
                                 </th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="bg-white divide-y divide-slate-100">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={7} className="px-6 py-4 text-center">
+                                    <td colSpan={7} className="px-6 py-12 text-center">
                                         <div className="flex justify-center">
-                                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
                                         </div>
                                     </td>
                                 </tr>
                             ) : rmas.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
+                                    <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
                                         No RMAs found matching your criteria.
                                     </td>
                                 </tr>
@@ -271,40 +230,37 @@ const RmaListPage: React.FC = () => {
                                     <tr
                                         key={rma.id}
                                         onClick={() => navigate(`/rmas/${rma.id}`)}
-                                        className="hover:bg-gray-50 cursor-pointer transition-colors"
+                                        className="hover:bg-indigo-50/40 cursor-pointer transition-all duration-200 group"
                                     >
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
-                                            {rma.rmaNo}
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <span className="text-sm font-bold text-indigo-600 group-hover:text-indigo-700">{rma.rmaNo}</span>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {rma.customer}
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-sm font-medium text-slate-900">{rma.customer}</div>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            <div className="text-gray-900">{rma.model}</div>
-                                            <div className="text-xs">{rma.serial}</div>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-sm text-slate-900">{rma.model}</div>
+                                            <div className="text-xs text-slate-500 font-mono bg-slate-100 px-1.5 py-0.5 rounded inline-block mt-1">{rma.serial}</div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <span className={clsx(
-                                                "px-2 inline-flex text-xs leading-5 font-semibold rounded-full",
+                                                "px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full border",
                                                 getStatusColor(rma.status)
                                             )}>
                                                 {rma.status}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                                             {rma.createdDate}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                                            {rma.board ?? '-'}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                                            {rma.face ?? '-'}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                                            {rma.defectSymptom ?? '-'}
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                                            <div className="flex flex-col gap-1">
+                                                <span className="text-xs">Board: {rma.board || '-'}</span>
+                                                <span className="text-xs">Symp: {rma.defectSymptom || '-'}</span>
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button className="text-gray-400 hover:text-blue-600">
+                                            <button className="text-slate-400 group-hover:text-indigo-600 p-2 rounded-full hover:bg-white hover:shadow-sm transition-all">
                                                 <Eye className="h-5 w-5" />
                                             </button>
                                         </td>
@@ -316,33 +272,25 @@ const RmaListPage: React.FC = () => {
                 </div>
 
                 {/* Pagination */}
-                <div className="bg-white px-4 py-3 border-t border-gray-200 flex items-center justify-between sm:px-6">
-                    <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                        <div>
-                            <p className="text-sm text-gray-700">
-                                Showing <span className="font-medium">{(page - 1) * limit + 1}</span> to <span className="font-medium">{Math.min(page * limit, total)}</span> of <span className="font-medium">{total}</span> results
-                            </p>
-                        </div>
-                        <div>
-                            <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                                <button
-                                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                                    disabled={page === 1}
-                                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                >
-                                    <span className="sr-only">Previous</span>
-                                    <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-                                </button>
-                                <button
-                                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                                    disabled={page === totalPages}
-                                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                >
-                                    <span className="sr-only">Next</span>
-                                    <ChevronRight className="h-5 w-5" aria-hidden="true" />
-                                </button>
-                            </nav>
-                        </div>
+                <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 flex items-center justify-between">
+                    <div className="text-sm text-slate-500">
+                        Showing <span className="font-bold text-slate-700">{(page - 1) * limit + 1}</span> to <span className="font-bold text-slate-700">{Math.min(page * limit, total)}</span> of <span className="font-bold text-slate-700">{total}</span>
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            disabled={page === 1}
+                            className="p-2 rounded-lg border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        >
+                            <ChevronLeft className="h-5 w-5" />
+                        </button>
+                        <button
+                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                            disabled={page === totalPages}
+                            className="p-2 rounded-lg border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        >
+                            <ChevronRight className="h-5 w-5" />
+                        </button>
                     </div>
                 </div>
             </div>

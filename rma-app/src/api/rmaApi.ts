@@ -134,6 +134,16 @@ export async function updateRmaApi(
     return res.data;
 }
 
+export const fetchMasterUsers = async () => {
+    // Gọi route /users mà chúng ta đã sửa trong auth.js
+    const response = await api.get('/users');
+    return response.data;
+};
+
+export const updateUserStatus = async (id: number, status: string) => {
+    const response = await api.put(`/users/${id}/status`, { status });
+    return response.data;
+};
 // Dashboard
 
 export async function getRmaStats() {
@@ -181,3 +191,9 @@ export async function getTrendsBreakdown() {
     const res = await api.get("/dashboard/trends-breakdown");
     return res.data as TrendsBreakdown;
 }
+
+// API Reset mật khẩu User về mặc định (123456)
+export const resetUserPassword = async (id: number) => {
+    const response = await api.put(`/users/${id}/reset-password`);
+    return response.data;
+};

@@ -1,142 +1,241 @@
 import React, { useEffect, useState } from 'react';
-import { Check, X, Trash2, Edit } from 'lucide-react';
+import { 
+  fetchMasterUsers, 
+  updateUserStatus, 
+  resetUserPassword // 1. Import hàm reset
+} from '../api/rmaApi';
+import { 
+  CheckCircle, 
+  XCircle, 
+  Trash2, 
+  Shield, 
+  ShieldAlert, 
+  UserCheck, 
+  UserX,
+  RotateCcw // 2. Import Icon Reset
+} from 'lucide-react';
+import clsx from 'clsx';
 
-const AdminUserPage = () => {
-    const [users, setUsers] = useState<any[]>([]);
-    
-    // Fetch users
-    const fetchUsers = async () => {
-        const res = await fetch('/api/users'); // API lấy list user
-        const data = await res.json();
-        setUsers(data);
-    };
+// Interface định nghĩa kiểu dữ liệu User
+interface User {
+  id: number;
+  employee_no: string;
+  display_name: string;
+  role: string;      // admin, user, sub_admin
+  status: string;    // active, pending, locked
+  created_at: string;
+  department?: string; // Tên bộ phận
+}
 
-    useEffect(() => { fetchUsers(); }, []);
+const AdminUserPage: React.FC = () => {
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-    // Xử lý phê duyệt / reject
-    const handleApproval = async (id: number, status: 'active' | 'rejected', role: string = 'user') => {
-        if (!confirm(`Bạn có chắc muốn ${status === 'active' ? 'phê duyệt' : 'từ chối'}?`)) return;
-        
-        await fetch(`/api/users/${id}/status`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status, role })
-        });
-        fetchUsers();
-    };
+  // Load danh sách user khi vào trang
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchMasterUsers();
+      // data trả về là mảng User[]
+      setUsers(data);
+      setError(null);
+    } catch (err: any) {
+      console.error(err);
+      setError('Không thể tải danh sách user');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const handleDelete = async (id: number) => {
-        if (!confirm('Xóa vĩnh viễn user này?')) return;
-        await fetch(`/api/users/${id}`, { method: 'DELETE' });
-        fetchUsers();
-    };
+  useEffect(() => {
+    loadUsers();
+  }, []);
 
-    const pendingUsers = users.filter(u => u.status === 'pending');
-    const activeUsers = users.filter(u => u.status === 'active');
+  // Xử lý Duyệt (Active)
+  const handleApprove = async (id: number) => {
+    if (!window.confirm('Bạn có chắc muốn DUYỆT tài khoản này?')) return;
+    try {
+      await updateUserStatus(id, 'active');
+      alert('Đã duyệt thành công!');
+      loadUsers(); // Reload lại bảng
+    } catch (err) {
+      alert('Lỗi khi duyệt user');
+    }
+  };
 
-    return (
-        <div className="p-6">
-            <h1 className="text-2xl font-bold mb-6">Quản trị Thành viên</h1>
+  // Xử lý Khóa (Lock)
+  const handleLock = async (id: number) => {
+    if (!window.confirm('Bạn có chắc muốn KHÓA tài khoản này?')) return;
+    try {
+      await updateUserStatus(id, 'locked');
+      alert('Đã khóa tài khoản!');
+      loadUsers();
+    } catch (err) {
+      alert('Lỗi khi khóa user');
+    }
+  };
 
-            {/* DANH SÁCH CHỜ PHÊ DUYỆT */}
-            <div className="mb-8 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <h2 className="text-lg font-semibold text-yellow-800 mb-4">
-                    Tài khoản chờ phê duyệt ({pendingUsers.length})
-                </h2>
-                <div className="overflow-x-auto bg-white rounded shadow">
-                    <table className="min-w-full">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-4 py-2 text-left">Mã NV</th>
-                                <th className="px-4 py-2 text-left">Tên hiển thị</th>
-                                <th className="px-4 py-2 text-left">Bộ phận</th>
-                                <th className="px-4 py-2 text-left">Ngày đăng ký</th>
-                                <th className="px-4 py-2 text-left">Phân quyền dự kiến</th>
-                                <th className="px-4 py-2 text-right">Hành động</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {pendingUsers.map(u => (
-                                <tr key={u.id} className="border-t">
-                                    <td className="px-4 py-2">{u.employee_no}</td>
-                                    <td className="px-4 py-2">{u.display_name}</td>
-                                    <td className="px-4 py-2">{u.department}</td>
-                                    <td className="px-4 py-2">{new Date(u.created_at).toLocaleDateString()}</td>
-                                    <td className="px-4 py-2">
-                                        {/* Dropdown chọn quyền khi duyệt */}
-                                        <select id={`role-${u.id}`} className="border rounded p-1 text-sm">
-                                            <option value="user">User (Chỉ xem)</option>
-                                            <option value="sub_admin">SubAdmin (Sửa)</option>
-                                            <option value="admin">Admin</option>
-                                        </select>
-                                    </td>
-                                    <td className="px-4 py-2 text-right space-x-2">
-                                        <button 
-                                            onClick={() => {
-                                                const role = (document.getElementById(`role-${u.id}`) as HTMLSelectElement).value;
-                                                handleApproval(u.id, 'active', role);
-                                            }}
-                                            className="text-green-600 hover:bg-green-100 p-1 rounded" title="Phê duyệt"
-                                        >
-                                            <Check size={18} />
-                                        </button>
-                                        <button 
-                                            onClick={() => handleApproval(u.id, 'rejected')}
-                                            className="text-red-600 hover:bg-red-100 p-1 rounded" title="Từ chối"
-                                        >
-                                            <X size={18} />
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                            {pendingUsers.length === 0 && (
-                                <tr><td colSpan={6} className="text-center py-4 text-gray-500">Không có yêu cầu nào</td></tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+  // 3. Hàm xử lý Reset Mật khẩu
+  const handleResetPassword = async (userId: number, userName: string) => {
+      if (!window.confirm(`⚠️ CẢNH BÁO:\nBạn có chắc muốn reset mật khẩu của "${userName}" về mặc định "123456" không?`)) {
+          return;
+      }
 
-            {/* DANH SÁCH THÀNH VIÊN */}
-            <div>
-                <h2 className="text-lg font-semibold mb-4">Danh sách thành viên</h2>
-                <div className="overflow-x-auto bg-white rounded shadow">
-                    <table className="min-w-full">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-4 py-2 text-left">Mã NV</th>
-                                <th className="px-4 py-2 text-left">Tên hiển thị</th>
-                                <th className="px-4 py-2 text-left">Bộ phận</th>
-                                <th className="px-4 py-2 text-left">Quyền</th>
-                                <th className="px-4 py-2 text-right">Hành động</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {activeUsers.map(u => (
-                                <tr key={u.id} className="border-t hover:bg-gray-50">
-                                    <td className="px-4 py-2">{u.employee_no}</td>
-                                    <td className="px-4 py-2">{u.display_name}</td>
-                                    <td className="px-4 py-2">{u.department}</td>
-                                    <td className="px-4 py-2">
-                                        <span className={`px-2 py-1 rounded text-xs font-bold 
-                                            ${u.role === 'admin' ? 'bg-purple-100 text-purple-800' : 
-                                              u.role === 'sub_admin' ? 'bg-blue-100 text-blue-800' : 
-                                              'bg-gray-100 text-gray-800'}`}>
-                                            {u.role.toUpperCase()}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-2 text-right">
-                                        <button className="text-blue-600 mr-3"><Edit size={16} /></button>
-                                        <button onClick={() => handleDelete(u.id)} className="text-red-600"><Trash2 size={16} /></button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+      try {
+          await resetUserPassword(userId);
+          alert(`✅ Thành công!\nMật khẩu của user ${userName} đã được đưa về: 123456`);
+      } catch (err: any) {
+          console.error(err);
+          alert('❌ Lỗi: Không thể reset mật khẩu. Vui lòng kiểm tra server.');
+      }
+  };
+
+  // Helper để hiển thị Role đẹp hơn
+  const getRoleBadge = (role: string) => {
+    switch (role) {
+      case 'admin':
+        return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 border border-purple-200">Admin</span>;
+      case 'sub_admin':
+        return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 border border-blue-200">Sub Admin</span>;
+      default:
+        return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 border border-green-200">User</span>;
+    }
+  };
+
+  // Helper hiển thị Status
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'active':
+        return (
+          <span className="flex items-center text-green-600 text-sm font-medium">
+            <CheckCircle size={16} className="mr-1" /> Active
+          </span>
+        );
+      case 'pending':
+        return (
+          <span className="flex items-center text-yellow-600 text-sm font-medium">
+            <ShieldAlert size={16} className="mr-1" /> Chờ duyệt
+          </span>
+        );
+      case 'locked':
+        return (
+          <span className="flex items-center text-red-600 text-sm font-medium">
+            <XCircle size={16} className="mr-1" /> Locked
+          </span>
+        );
+      default:
+        return status;
+    }
+  };
+
+  if (loading) return <div className="p-8 text-center">Đang tải dữ liệu...</div>;
+  if (error) return <div className="p-8 text-center text-red-600">{error}</div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <Shield className="text-blue-600" />
+            Quản trị User
+          </h1>
+          <p className="text-gray-500 mt-1">Quản lý danh sách nhân viên và phân quyền truy cập</p>
         </div>
-    );
+        <button 
+            onClick={loadUsers}
+            className="px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+            Làm mới
+        </button>
+      </div>
+
+      <div className="bg-white shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nhân viên</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bộ phận</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quyền (Role)</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ngày tạo</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {users.map((user) => (
+              <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  #{user.id}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-gray-900">{user.display_name || 'No Name'}</span>
+                    <span className="text-xs text-gray-500">{user.employee_no}</span>
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                   {/* Hiển thị bộ phận, nếu không có thì hiện gạch ngang */}
+                   {user.department || '-'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  {getRoleBadge(user.role)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  {getStatusBadge(user.status)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {new Date(user.created_at).toLocaleDateString('vi-VN')}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <div className="flex items-center justify-end space-x-3">
+                    
+                    {/* Nút Approve (Chỉ hiện khi pending) */}
+                    {user.status === 'pending' && (
+                      <button 
+                        onClick={() => handleApprove(user.id)}
+                        className="text-green-600 hover:text-green-900 flex items-center"
+                        title="Duyệt tài khoản"
+                      >
+                        <UserCheck size={18} />
+                      </button>
+                    )}
+
+                    {/* Nút Reset Password (Mới thêm) */}
+                    <button 
+                        onClick={() => handleResetPassword(user.id, user.display_name)}
+                        className="text-orange-500 hover:text-orange-700 flex items-center"
+                        title="Reset mật khẩu về 123456"
+                    >
+                        <RotateCcw size={18} />
+                    </button>
+
+                    {/* Nút Khóa (Hiện khi active) */}
+                    {user.status === 'active' && user.role !== 'admin' && (
+                      <button 
+                        onClick={() => handleLock(user.id)}
+                        className="text-yellow-600 hover:text-yellow-900 flex items-center"
+                        title="Khóa tài khoản"
+                      >
+                        <UserX size={18} />
+                      </button>
+                    )}
+
+                    {/* Nút Xóa (Demo) */}
+                    <button className="text-gray-400 hover:text-red-600 transition-colors" title="Xóa vĩnh viễn">
+                      <Trash2 size={18} />
+                    </button>
+
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 };
 
 export default AdminUserPage;

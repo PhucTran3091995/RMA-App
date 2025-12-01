@@ -25,12 +25,17 @@ router.get('/auth/check-employee/:id', async (req, res) => {
         }
 
         // Lấy thông tin từ bảng Employees
-        const [rows] = await pool.query(`
-            SELECT e.employee_no, e.full_name, d.name as department_name, e.department_id 
-            FROM employees e
-            LEFT JOIN departments d ON e.department_id = d.id
-            WHERE e.employee_no = ?
-        `, [id]);
+        const [rows] = await pool.query(
+            `SELECT 
+                e.employee_no, 
+                e.full_name, 
+                e.department as department_name,  -- Lấy tên phòng trực tiếp từ bảng employees
+                d.id as department_id             -- Tìm ID phòng ban (nếu tên khớp với bảng departments)
+             FROM employees e
+             LEFT JOIN departments d ON e.department = d.name -- Join theo TÊN thay vì ID
+             WHERE e.employee_no = ?`, 
+            [id]
+        );
 
         if (rows.length === 0) {
             return res.status(404).json({ message: 'Không tìm thấy mã nhân viên trong hệ thống.' });
@@ -131,14 +136,26 @@ router.post('/auth/login', async (req, res) => {
 router.get('/users', async (req, res) => {
     try {
         const [users] = await pool.query(`
-            SELECT u.id, u.employee_no, u.display_name, u.role, u.status, u.created_at, d.name as department
+            SELECT 
+                u.id, 
+                u.employee_no, 
+                u.display_name, 
+                u.role, 
+                u.status, 
+                u.created_at,
+                -- Logic: Nếu tìm thấy tên trong bảng departments thì lấy, 
+                -- nếu không thì lấy tạm tên gốc từ bảng employees
+                COALESCE(d.name, e.department) as department
             FROM users u
             LEFT JOIN departments d ON u.department_id = d.id
+            LEFT JOIN employees e ON u.employee_no = e.employee_no
             ORDER BY u.created_at DESC
         `);
+
         res.json(users);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
+    } catch (error) {
+        console.error("Lỗi lấy danh sách user:", error);
+        res.status(500).json({ message: 'Lỗi server khi lấy danh sách user' });
     }
 });
 
@@ -173,6 +190,30 @@ router.delete('/users/:id', async (req, res) => {
         res.json({ message: 'Đã xóa người dùng' });
     } catch (err) {
         res.status(500).json({ message: err.message });
+    }
+});
+
+// API: Admin reset mật khẩu user về mặc định '123456'
+router.put('/users/:id/reset-password', async (req, res) => {
+    const { id } = req.params;
+    
+    // Mật khẩu mặc định là '123456'. 
+    // LƯU Ý QUAN TRỌNG:
+    // Nếu bạn đang dùng bcrypt, hãy thay chuỗi dưới bằng mã hash của 123456.
+    // Ví dụ mã hash của 123456 (bcrypt) thường là: $2b$10$X7... (bạn có thể tự tạo)
+    // Ở đây tôi để text thường để bạn test trước.
+    const defaultPass = '123456'; 
+
+    try {
+        await pool.query(
+            'UPDATE users SET password = ? WHERE id = ?', 
+            [defaultPass, id]
+        );
+        console.log(`✅ Đã reset mật khẩu cho User ID ${id} về ${defaultPass}`);
+        res.json({ message: 'Đã reset mật khẩu về 123456 thành công' });
+    } catch (error) {
+        console.error("Lỗi reset password:", error);
+        res.status(500).json({ message: 'Lỗi server khi reset mật khẩu' });
     }
 });
 

@@ -80,13 +80,13 @@ const Layout: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-50"> {/* Đổi nền tổng thể sang xám nhạt */}
       {/* Mobile menu button */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b px-4 py-2 flex items-center justify-between">
-        <span className="font-bold text-xl text-blue-900">RMA System</span>
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between shadow-sm">
+        <span className="font-bold text-xl text-blue-700">RMA System</span> {/* Chữ xanh */}
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
+          className="p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100"
         >
           {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </button>
@@ -95,63 +95,68 @@ const Layout: React.FC = () => {
       {/* Sidebar Navigation */}
       <aside 
         className={clsx(
-          "fixed inset-y-0 left-0 z-40 w-64 bg-blue-900 text-white transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:inset-auto",
+          // Đổi bg-blue-900 -> bg-white, thêm border phải
+          "fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 text-gray-600 transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:inset-auto",
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
         <div className="flex flex-col h-full">
           {/* Logo Area */}
-          <div className="flex items-center justify-center h-16 border-b border-blue-800 bg-blue-950">
-            <h1 className="text-xl font-bold tracking-wider">RMA APP</h1>
+          {/* Đổi bg-blue-950 -> bg-white */}
+          <div className="flex items-center justify-center h-16 border-b border-gray-100 bg-white">
+            <h1 className="text-xl font-bold tracking-wider text-blue-800">RMA APP</h1>
           </div>
 
           {/* Navigation Links */}
-          <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
+          <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
             {navItems
-              // LỌC MENU DỰA TRÊN ROLE
+              // LỌC MENU DỰA TRÊN ROLE (Giữ nguyên logic)
               .filter(item => user?.role && item.roles.includes(user.role))
               .map((item) => (
                 <NavLink
                   key={item.path}
                   to={item.path}
-                  onClick={() => setIsMobileMenuOpen(false)} // Đóng menu mobile khi click
+                  onClick={() => setIsMobileMenuOpen(false)} 
                   className={({ isActive }) =>
                     clsx(
                       isActive
-                        ? 'bg-blue-800 text-white'
-                        : 'text-blue-100 hover:bg-blue-800 hover:text-white',
-                      'group flex items-center px-2 py-2 text-base font-medium rounded-md transition-colors'
+                        ? 'bg-blue-50 text-blue-700 font-semibold' // Active: Nền xanh nhạt, chữ xanh đậm
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900', // Inactive: Chữ xám, hover xám nhạt
+                      'group flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors'
                     )
                   }
                 >
-                  <item.icon className="mr-4 h-6 w-6 flex-shrink-0" aria-hidden="true" />
+                  <item.icon className={clsx("mr-3 h-5 w-5 flex-shrink-0 transition-colors")} aria-hidden="true" />
                   {item.label}
                 </NavLink>
             ))}
           </nav>
 
           {/* User Profile Section */}
-          <div className="border-t border-blue-800 p-4 bg-blue-950">
+          {/* Đổi bg-blue-950 -> bg-gray-50/50 */}
+          <div className="border-t border-gray-200 p-4 bg-gray-50">
             <div className="flex items-center mb-4">
-              <div className="h-9 w-9 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
+              {/* Avatar: Xanh nhạt */}
+              <div className="h-9 w-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold border border-blue-200">
                 {user?.name?.charAt(0).toUpperCase() || 'U'}
               </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-white truncate max-w-[140px]">
+              <div className="ml-3 overflow-hidden">
+                <p className="text-sm font-semibold text-gray-900 truncate max-w-[140px]">
                   {user?.name || 'User'}
                 </p>
                 <span className={clsx(
                   "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium mt-1",
-                  getRoleBadgeColor(user?.role)
+                  getRoleBadgeColor(user?.role) // Giữ nguyên hàm này
                 )}>
                   {user?.role?.toUpperCase() || 'GUEST'}
                 </span>
               </div>
             </div>
             
+            {/* Nút Logout: Đổi sang nền đỏ nhạt */}
             <button
               onClick={handleLogout}
-              className="w-full flex items-center justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+              className="w-full flex items-center justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
             >
               <LogOut className="mr-2 h-4 w-4" />
               Đăng xuất
@@ -169,7 +174,7 @@ const Layout: React.FC = () => {
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-auto md:pt-0 pt-16">
+      <main className="flex-1 overflow-auto md:pt-0 pt-16 bg-gray-50">
         <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <Outlet />
         </div>

@@ -1,13 +1,13 @@
-﻿// routes/rma.js
+﻿// File: backend/routes/rma.js
 const express = require('express');
 const router = express.Router();
-const pool = require('../db');
+const pool = require('../db'); // Đảm bảo đường dẫn tới file db.js đúng
 
-// Helper: map DB row -> shape frontend đang dùng
+// Helper: Map dữ liệu từ DB sang format Frontend cần
 function mapRmaRow(row) {
     return {
         id: row.id,
-        rmaNo: row.rma_no,                 // sẽ giải thích ngay bên dưới
+        rmaNo: row.rma_no, // Logic xử lý rma_no nằm trong câu SQL
         customer: row.buyer_name,
         serial: row.main_pid,
         model: row.model_name,
@@ -22,7 +22,7 @@ function mapRmaRow(row) {
 
 /**
  * GET /api/rmas
- * Query: page, limit, search, status
+ * Lấy danh sách RMA (Có phân trang, tìm kiếm, lọc theo ngày/trạng thái)
  */
 router.get('/', async (req, res) => {
     try {
@@ -34,6 +34,7 @@ router.get('/', async (req, res) => {
             startDate = '',
             endDate = '',
         } = req.query;
+
         page = parseInt(page, 10);
         limit = parseInt(limit, 10);
         const offset = (page - 1) * limit;
@@ -41,8 +42,8 @@ router.get('/', async (req, res) => {
         const params = [];
         let where = 'WHERE 1=1';
 
+        // 1. Xử lý Tìm kiếm (Search Global)
         const normalizedSearch = search.trim().toLowerCase();
-
         if (normalizedSearch) {
             where += `
               AND (
@@ -57,67 +58,66 @@ router.get('/', async (req, res) => {
                 DATE_FORMAT(rb.rma_date, '%Y-%m-%d') LIKE ?
               )`;
             const like = `%${normalizedSearch}%`;
+            // Push tham số cho mỗi dấu ? ở trên (9 dấu)
             params.push(like, like, like, like, like, like, like, like, like);
         }
 
-
-
+        // 2. Xử lý Lọc theo ngày
         if (startDate) {
             where += ' AND rb.rma_date >= ?';
             params.push(startDate);
         }
-
         if (endDate) {
             where += ' AND rb.rma_date <= ?';
             params.push(endDate);
         }
 
+        // 3. Xử lý Lọc theo trạng thái
         if (status && status !== 'All') {
-            // status_actual trong DB: 'IN', 'OUT', 'Processing', ...
             where += ` AND rb.status_actual = ?`;
             params.push(status);
         }
 
-        // Count
+        // 4. Query Đếm tổng số bản ghi (Total Count)
         const [countRows] = await pool.query(
             `
-      SELECT COUNT(*) as total
-      FROM rma_boards rb
-      LEFT JOIN buyers b ON rb.buyer_id = b.id
-      LEFT JOIN models m ON rb.model_id = m.id
-      LEFT JOIN boards brd ON rb.board_id = brd.id
-      ${where}
-      `,
+            SELECT COUNT(*) as total
+            FROM rma_boards rb
+            LEFT JOIN buyers b ON rb.buyer_id = b.id
+            LEFT JOIN models m ON rb.model_id = m.id
+            LEFT JOIN boards brd ON rb.board_id = brd.id
+            ${where}
+            `,
             params
         );
         const total = countRows[0].total;
 
-        // Data
+        // 5. Query Lấy dữ liệu (Data Pagination)
         const [rows] = await pool.query(
             `
-      SELECT
-        rb.id,
-        DATE_FORMAT(rb.rma_date, '%Y-%m-%d') AS rma_date,
-        b.name AS buyer_name,
-        m.name AS model_name,
-        brd.name AS board_name,
-        rb.face,
-        rb.defect_symptom_raw,
-        rb.main_pid,
-        rb.status_actual,
-        -- rma_no: ưu tiên dùng Main Work Order, nếu null thì tạo RMA-<id>
-        IF(rb.main_work_order IS NOT NULL AND rb.main_work_order <> '',
-           rb.main_work_order,
-           CONCAT('RMA-', rb.id)
-        ) AS rma_no
-      FROM rma_boards rb
-      LEFT JOIN buyers b ON rb.buyer_id = b.id
-      LEFT JOIN models m ON rb.model_id = m.id
-      LEFT JOIN boards brd ON rb.board_id = brd.id
-      ${where}
-      ORDER BY rb.rma_date DESC, rb.id DESC
-      LIMIT ? OFFSET ?
-      `,
+            SELECT
+                rb.id,
+                DATE_FORMAT(rb.rma_date, '%Y-%m-%d') AS rma_date,
+                b.name AS buyer_name,
+                m.name AS model_name,
+                brd.name AS board_name,
+                rb.face,
+                rb.defect_symptom_raw,
+                rb.main_pid,
+                rb.status_actual,
+                -- Logic rma_no: Nếu main_work_order rỗng thì tự sinh RMA-<id>
+                IF(rb.main_work_order IS NOT NULL AND rb.main_work_order <> '',
+                   rb.main_work_order,
+                   CONCAT('RMA-', rb.id)
+                ) AS rma_no
+            FROM rma_boards rb
+            LEFT JOIN buyers b ON rb.buyer_id = b.id
+            LEFT JOIN models m ON rb.model_id = m.id
+            LEFT JOIN boards brd ON rb.board_id = brd.id
+            ${where}
+            ORDER BY rb.rma_date DESC, rb.id DESC
+            LIMIT ? OFFSET ?
+            `,
             [...params, limit, offset]
         );
 
@@ -135,25 +135,26 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /api/rmas/:id
+ * Lấy chi tiết 1 RMA
  */
 router.get('/:id', async (req, res) => {
     try {
         const id = req.params.id;
         const [rows] = await pool.query(
             `
-      SELECT
-        rb.*,
-        DATE_FORMAT(rb.rma_date, '%Y-%m-%d') AS rma_date_fmt,
-        DATE_FORMAT(rb.clear_date, '%Y-%m-%d') AS clear_date_fmt,
-        b.name AS buyer_name,
-        m.name AS model_name,
-        brd.name AS board_name
-      FROM rma_boards rb
-      LEFT JOIN buyers b ON rb.buyer_id = b.id
-      LEFT JOIN models m ON rb.model_id = m.id
-      LEFT JOIN boards brd ON rb.board_id = brd.id
-      WHERE rb.id = ?
-      `,
+            SELECT
+                rb.*,
+                DATE_FORMAT(rb.rma_date, '%Y-%m-%d') AS rma_date_fmt,
+                DATE_FORMAT(rb.clear_date, '%Y-%m-%d') AS clear_date_fmt,
+                b.name AS buyer_name,
+                m.name AS model_name,
+                brd.name AS board_name
+            FROM rma_boards rb
+            LEFT JOIN buyers b ON rb.buyer_id = b.id
+            LEFT JOIN models m ON rb.model_id = m.id
+            LEFT JOIN boards brd ON rb.board_id = brd.id
+            WHERE rb.id = ?
+            `,
             [id]
         );
 
@@ -163,20 +164,16 @@ router.get('/:id', async (req, res) => {
 
         const row = rows[0];
 
-        // map sang form frontend
+        // Map sang format chi tiết cho form edit/detail
         const rma = {
             id: row.id,
-            rmaNo:
-                row.main_work_order && row.main_work_order !== ''
-                    ? row.main_work_order
-                    : `RMA-${row.id}`,
+            rmaNo: row.main_work_order && row.main_work_order !== '' ? row.main_work_order : `RMA-${row.id}`,
             customer: row.buyer_name,
             serial: row.main_pid,
             model: row.model_name,
             status: row.status_actual,
-            technician: null, // chưa có field
+            technician: null,
             createdDate: row.rma_date_fmt,
-            // extra field nếu bạn muốn thêm vào UI
             board: row.board_name,
             qty: row.qty,
             defectSymptomRaw: row.defect_symptom_raw,
@@ -196,10 +193,10 @@ router.get('/:id', async (req, res) => {
 
 /**
  * POST /api/rmas
- * Tạo RMA mới (bản ghi mới trong rma_boards)
- * Ở giai đoạn 1 ta làm tối giản: insert vài cột cơ bản
+ * Tạo RMA mới (Có Transaction để xử lý Buyer/Model tự động)
  */
 router.post('/', async (req, res) => {
+    const conn = await pool.getConnection(); // Lấy connection để dùng transaction
     try {
         const {
             customer, // buyer name
@@ -209,83 +206,74 @@ router.post('/', async (req, res) => {
         } = req.body;
 
         if (!customer || !serial || !model) {
-            return res
-                .status(400)
-                .json({ message: 'customer, serial, model are required' });
+            return res.status(400).json({ message: 'customer, serial, and model are required' });
         }
 
-        const conn = await pool.getConnection();
-        try {
-            await conn.beginTransaction();
+        await conn.beginTransaction();
 
-            // đảm bảo tồn tại buyer, model
-            const [buyerRows] = await conn.query(
-                `SELECT id FROM buyers WHERE name = ?`,
-                [customer]
-            );
-            let buyerId =
-                buyerRows.length > 0
-                    ? buyerRows[0].id
-                    : (await conn.query(`INSERT INTO buyers (name) VALUES (?)`, [
-                        customer,
-                    ]))[0].insertId;
-
-            const [modelRows] = await conn.query(
-                `SELECT id FROM models WHERE name = ?`,
-                [model]
-            );
-            let modelId =
-                modelRows.length > 0
-                    ? modelRows[0].id
-                    : (await conn.query(`INSERT INTO models (name) VALUES (?)`, [
-                        model,
-                    ]))[0].insertId;
-
-            const [result] = await conn.query(
-                `
-        INSERT INTO rma_boards (
-          year, month, week,
-          rma_date, issue_date,
-          buyer_id, model_id,
-          main_pid,
-          qty,
-          status_actual
-        )
-        VALUES (
-          YEAR(CURDATE()),
-          MONTH(CURDATE()),
-          WEEK(CURDATE(), 1),
-          CURDATE(),
-          CURDATE(),
-          ?, ?, ?,
-          1,
-          ?
-        )
-        `,
-                [buyerId, modelId, serial, status || 'IN']
-            );
-
-            const newId = result.insertId;
-            await conn.commit();
-
-            res.status(201).json({ id: newId });
-        } catch (err) {
-            await conn.rollback();
-            throw err;
-        } finally {
-            conn.release();
+        // 1. Xử lý Buyer (Tìm hoặc Tạo mới)
+        const [buyerRows] = await conn.query(`SELECT id FROM buyers WHERE name = ?`, [customer]);
+        let buyerId;
+        if (buyerRows.length > 0) {
+            buyerId = buyerRows[0].id;
+        } else {
+            const [newBuyer] = await conn.query(`INSERT INTO buyers (name) VALUES (?)`, [customer]);
+            buyerId = newBuyer.insertId;
         }
+
+        // 2. Xử lý Model (Tìm hoặc Tạo mới)
+        const [modelRows] = await conn.query(`SELECT id FROM models WHERE name = ?`, [model]);
+        let modelId;
+        if (modelRows.length > 0) {
+            modelId = modelRows[0].id;
+        } else {
+            const [newModel] = await conn.query(`INSERT INTO models (name) VALUES (?)`, [model]);
+            modelId = newModel.insertId;
+        }
+
+        // 3. Insert vào bảng rma_boards
+        const [result] = await conn.query(
+            `
+            INSERT INTO rma_boards (
+                year, month, week,
+                rma_date, issue_date,
+                buyer_id, model_id,
+                main_pid,
+                qty,
+                status_actual
+            )
+            VALUES (
+                YEAR(CURDATE()),
+                MONTH(CURDATE()),
+                WEEK(CURDATE(), 1),
+                CURDATE(),
+                CURDATE(),
+                ?, ?, ?,
+                1,
+                ?
+            )
+            `,
+            [buyerId, modelId, serial, status || 'IN']
+        );
+
+        await conn.commit(); // Lưu thay đổi
+        res.status(201).json({ id: result.insertId, message: 'RMA created successfully' });
+
     } catch (err) {
+        await conn.rollback(); // Hoàn tác nếu lỗi
         console.error('POST /api/rmas error', err);
         res.status(500).json({ message: 'Internal server error' });
+    } finally {
+        conn.release(); // Trả kết nối về pool
     }
 });
 
 /**
  * PUT /api/rmas/:id
- * Cho phép update một số field chính
+ * Cập nhật RMA
  */
 router.put('/:id', async (req, res) => {
+    const conn = await pool.getConnection();
     try {
         const id = req.params.id;
         const {
@@ -299,99 +287,91 @@ router.put('/:id', async (req, res) => {
             invoiceNo,
         } = req.body;
 
-        const conn = await pool.getConnection();
-        try {
-            await conn.beginTransaction();
+        await conn.beginTransaction();
 
-            // update buyer/model nếu có
-            let buyerId = null;
-            if (customer) {
-                const [buyerRows] = await conn.query(
-                    `SELECT id FROM buyers WHERE name = ?`,
-                    [customer]
-                );
-                buyerId =
-                    buyerRows.length > 0
-                        ? buyerRows[0].id
-                        : (await conn.query(`INSERT INTO buyers (name) VALUES (?)`, [
-                            customer,
-                        ]))[0].insertId;
-            }
+        const fields = [];
+        const params = [];
 
-            let modelId = null;
-            if (model) {
-                const [modelRows] = await conn.query(
-                    `SELECT id FROM models WHERE name = ?`,
-                    [model]
-                );
-                modelId =
-                    modelRows.length > 0
-                        ? modelRows[0].id
-                        : (await conn.query(`INSERT INTO models (name) VALUES (?)`, [
-                            model,
-                        ]))[0].insertId;
+        // Nếu cập nhật tên Customer -> Cần tìm ID hoặc tạo mới
+        if (customer) {
+            const [buyerRows] = await conn.query(`SELECT id FROM buyers WHERE name = ?`, [customer]);
+            let buyerId;
+            if (buyerRows.length > 0) {
+                buyerId = buyerRows[0].id;
+            } else {
+                const [newBuyer] = await conn.query(`INSERT INTO buyers (name) VALUES (?)`, [customer]);
+                buyerId = newBuyer.insertId;
             }
-
-            const fields = [];
-            const params = [];
-
-            if (buyerId) {
-                fields.push('buyer_id = ?');
-                params.push(buyerId);
-            }
-            if (modelId) {
-                fields.push('model_id = ?');
-                params.push(modelId);
-            }
-            if (serial) {
-                fields.push('main_pid = ?');
-                params.push(serial);
-            }
-            if (status) {
-                fields.push('status_actual = ?');
-                params.push(status);
-            }
-            if (clearDate) {
-                fields.push('clear_date = ?');
-                params.push(clearDate);
-            }
-            if (clearType) {
-                fields.push('clear_type = ?');
-                params.push(clearType);
-            }
-            if (paymentStatus) {
-                fields.push('payment_status = ?');
-                params.push(paymentStatus);
-            }
-            if (invoiceNo) {
-                fields.push('invoice_no = ?');
-                params.push(invoiceNo);
-            }
-
-            if (fields.length === 0) {
-                await conn.rollback();
-                return res.status(400).json({ message: 'Nothing to update' });
-            }
-
-            const sql = `UPDATE rma_boards SET ${fields.join(', ')} WHERE id = ?`;
-            params.push(id);
-
-            await conn.query(sql, params);
-            await conn.commit();
-
-            res.json({ message: 'Updated' });
-        } catch (err) {
-            await conn.rollback();
-            throw err;
-        } finally {
-            conn.release();
+            fields.push('buyer_id = ?');
+            params.push(buyerId);
         }
+
+        // Nếu cập nhật Model -> Cần tìm ID hoặc tạo mới
+        if (model) {
+            const [modelRows] = await conn.query(`SELECT id FROM models WHERE name = ?`, [model]);
+            let modelId;
+            if (modelRows.length > 0) {
+                modelId = modelRows[0].id;
+            } else {
+                const [newModel] = await conn.query(`INSERT INTO models (name) VALUES (?)`, [model]);
+                modelId = newModel.insertId;
+            }
+            fields.push('model_id = ?');
+            params.push(modelId);
+        }
+
+        // Cập nhật các trường thông thường
+        if (serial) {
+            fields.push('main_pid = ?');
+            params.push(serial);
+        }
+        if (status) {
+            fields.push('status_actual = ?');
+            params.push(status);
+        }
+        if (clearDate) {
+            fields.push('clear_date = ?');
+            params.push(clearDate);
+        }
+        if (clearType) {
+            fields.push('clear_type = ?');
+            params.push(clearType);
+        }
+        if (paymentStatus) {
+            fields.push('payment_status = ?');
+            params.push(paymentStatus);
+        }
+        if (invoiceNo) {
+            fields.push('invoice_no = ?');
+            params.push(invoiceNo);
+        }
+
+        if (fields.length === 0) {
+            await conn.rollback();
+            return res.json({ message: 'Nothing to update' });
+        }
+
+        const sql = `UPDATE rma_boards SET ${fields.join(', ')} WHERE id = ?`;
+        params.push(id);
+
+        await conn.query(sql, params);
+        await conn.commit();
+
+        res.json({ message: 'Updated successfully' });
+
     } catch (err) {
+        await conn.rollback();
         console.error('PUT /api/rmas/:id error', err);
         res.status(500).json({ message: 'Internal server error' });
+    } finally {
+        conn.release();
     }
 });
 
+/**
+ * POST /api/rmas/validate
+ * Kiểm tra danh sách Serial có tồn tại không (Dùng cho tính năng Check hàng loạt)
+ */
 router.post('/validate', async (req, res) => {
     try {
         const { serials } = req.body;
@@ -400,9 +380,7 @@ router.post('/validate', async (req, res) => {
             return res.json([]);
         }
 
-        // Tạo chuỗi dấu ? cho câu lệnh SQL IN (...)
         const placeholders = serials.map(() => '?').join(',');
-
         const [rows] = await pool.query(
             `
             SELECT
@@ -420,14 +398,13 @@ router.post('/validate', async (req, res) => {
             serials
         );
 
-        // Map data trả về format giống frontend
         const result = rows.map(row => ({
             id: row.id,
             serial: row.main_pid,
             model: row.model_name,
             customer: row.buyer_name,
             status: row.status_actual,
-            createdDate: new Date(row.rma_date).toISOString().split('T')[0]
+            createdDate: row.rma_date ? new Date(row.rma_date).toISOString().split('T')[0] : null
         }));
 
         res.json(result);
@@ -437,6 +414,10 @@ router.post('/validate', async (req, res) => {
     }
 });
 
+/**
+ * POST /api/rmas/confirm-clear
+ * Chuyển trạng thái hàng loạt sang OUT (Thanh lý/Trả hàng)
+ */
 router.post('/confirm-clear', async (req, res) => {
     try {
         const { ids } = req.body;
@@ -446,22 +427,18 @@ router.post('/confirm-clear', async (req, res) => {
         }
 
         const placeholders = ids.map(() => '?').join(',');
-
         const sql = `
-            UPDATE rma_boards 
-            SET status_actual = 'OUT', clear_date = CURDATE() 
+            UPDATE rma_boards
+            SET status_actual = 'OUT', clear_date = CURDATE()
             WHERE id IN (${placeholders})
         `;
 
         await pool.query(sql, ids);
-
         res.json({ message: 'Cleared successfully', count: ids.length });
     } catch (err) {
         console.error('POST /api/rmas/confirm-clear error', err);
         res.status(500).json({ message: 'Internal server error' });
     }
 });
-
-
 
 module.exports = router;

@@ -70,7 +70,7 @@ const LoginPage: React.FC = () => {
                     RMA SYSTEM
                 </h2>
                 <p className="mt-2 text-center text-sm text-gray-600">
-                    Đăng nhập hệ thống quản lý
+                    Đăng nhập website quản lý RMA
                 </p>
             </div>
 

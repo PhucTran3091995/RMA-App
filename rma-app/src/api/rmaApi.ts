@@ -197,3 +197,11 @@ export const resetUserPassword = async (id: number) => {
     const response = await api.put(`/users/${id}/reset-password`);
     return response.data;
 };
+
+// API lấy thống kê Dashboard
+export const fetchDashboardStats = async (buyer?: string) => {
+    const response = await api.get('/dashboard/stats', {
+        params: { buyer }
+    });
+    return response.data;
+};

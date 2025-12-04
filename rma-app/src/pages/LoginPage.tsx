@@ -24,7 +24,6 @@ const LoginPage: React.FC = () => {
         setIsLoading(true);
 
         try {
-            // Gọi API đăng nhập thật (thay thế cho mock logic cũ)
             const res = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -37,24 +36,22 @@ const LoginPage: React.FC = () => {
                 throw new Error(data.message || 'Đăng nhập thất bại');
             }
 
-            // Lưu thông tin user vào store
-            // Giả sử API trả về: { token: '...', user: { name: '...', role: '...' } }
-            login(data.user, data.token);
+            // [FIX] Backend không trả về email, nhưng type User yêu cầu email.
+            // Ta thêm email rỗng hoặc lấy từ data nếu có để tránh lỗi TS nếu strict mode bật.
+            const userWithEmail = {
+                ...data.user,
+                email: data.user.email || "" // Thêm dòng này để thỏa mãn type User
+            };
+
+            // Lưu vào LocalStorage
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(userWithEmail));
+
+            // Cập nhật State
+            login(userWithEmail, data.token);
             navigate('/');
             
         } catch (err: any) {
-            // Fallback cho Demo nếu chưa chạy backend thật
-            // Nếu nhập đúng tk Admin vừa tạo thì cho vào
-            if (employeeNo === '2023020087' && password === '3091995') {
-                login({
-                    name: 'Admin',
-                    role: 'admin',
-                    email: 'admin@company.com'
-                }, 'demo-token');
-                navigate('/');
-            } else {
-                setError(err.message || 'Thông tin đăng nhập không chính xác');
-            }
         } finally {
             setIsLoading(false);
         }

@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { 
   fetchMasterUsers, 
   updateUserStatus, 
-  resetUserPassword // 1. Import hàm reset
+  resetUserPassword,
+  deleteUser,      // [Mới] Import hàm xóa
+  updateUserRole   // [Mới] Import hàm update role
 } from '../api/rmaApi';
 import { 
   CheckCircle, 
@@ -12,19 +14,17 @@ import {
   ShieldAlert, 
   UserCheck, 
   UserX,
-  RotateCcw // 2. Import Icon Reset
+  RotateCcw 
 } from 'lucide-react';
-import clsx from 'clsx';
 
-// Interface định nghĩa kiểu dữ liệu User
 interface User {
   id: number;
   employee_no: string;
   display_name: string;
-  role: string;      // admin, user, sub_admin
-  status: string;    // active, pending, locked
+  role: string;      
+  status: string;    
   created_at: string;
-  department?: string; // Tên bộ phận
+  department?: string; 
 }
 
 const AdminUserPage: React.FC = () => {
@@ -32,12 +32,10 @@ const AdminUserPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load danh sách user khi vào trang
   const loadUsers = async () => {
     try {
       setLoading(true);
       const data = await fetchMasterUsers();
-      // data trả về là mảng User[]
       setUsers(data);
       setError(null);
     } catch (err: any) {
@@ -52,19 +50,17 @@ const AdminUserPage: React.FC = () => {
     loadUsers();
   }, []);
 
-  // Xử lý Duyệt (Active)
   const handleApprove = async (id: number) => {
     if (!window.confirm('Bạn có chắc muốn DUYỆT tài khoản này?')) return;
     try {
       await updateUserStatus(id, 'active');
       alert('Đã duyệt thành công!');
-      loadUsers(); // Reload lại bảng
+      loadUsers();
     } catch (err) {
       alert('Lỗi khi duyệt user');
     }
   };
 
-  // Xử lý Khóa (Lock)
   const handleLock = async (id: number) => {
     if (!window.confirm('Bạn có chắc muốn KHÓA tài khoản này?')) return;
     try {
@@ -76,54 +72,57 @@ const AdminUserPage: React.FC = () => {
     }
   };
 
-  // 3. Hàm xử lý Reset Mật khẩu
   const handleResetPassword = async (userId: number, userName: string) => {
-      if (!window.confirm(`⚠️ CẢNH BÁO:\nBạn có chắc muốn reset mật khẩu của "${userName}" về mặc định "123456" không?`)) {
-          return;
-      }
-
+      if (!window.confirm(`⚠️ CẢNH BÁO:\nBạn có chắc muốn reset mật khẩu của "${userName}" về mặc định "123456" không?`)) return;
       try {
           await resetUserPassword(userId);
           alert(`✅ Thành công!\nMật khẩu của user ${userName} đã được đưa về: 123456`);
       } catch (err: any) {
           console.error(err);
-          alert('❌ Lỗi: Không thể reset mật khẩu. Vui lòng kiểm tra server.');
+          alert('❌ Lỗi: Không thể reset mật khẩu.');
       }
   };
 
-  // Helper để hiển thị Role đẹp hơn
-  const getRoleBadge = (role: string) => {
-    switch (role) {
-      case 'admin':
-        return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 border border-purple-200">Admin</span>;
-      case 'sub_admin':
-        return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 border border-blue-200">Sub Admin</span>;
-      default:
-        return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 border border-green-200">User</span>;
+  // --- [LOGIC MỚI] Xử lý Xóa User ---
+  const handleDelete = async (userId: number, userName: string) => {
+    const confirmMsg = `⛔️ CẢNH BÁO NGUY HIỂM:\n\nBạn đang chuẩn bị XÓA VĨNH VIỄN tài khoản "${userName}".\nHành động này không thể hoàn tác.\n\nBạn có chắc chắn muốn tiếp tục?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+        await deleteUser(userId);
+        alert(`✅ Đã xóa user "${userName}" thành công.`);
+        // Cập nhật lại state trực tiếp để đỡ phải load lại API
+        setUsers(prev => prev.filter(u => u.id !== userId));
+    } catch (err) {
+        console.error(err);
+        alert('❌ Lỗi: Không thể xóa user (Có thể user đang liên kết với dữ liệu RMA).');
     }
   };
 
-  // Helper hiển thị Status
+  // --- [LOGIC MỚI] Xử lý Thay đổi Role ---
+  const handleRoleChange = async (userId: number, newRole: string) => {
+      // Cập nhật Optimistic UI (cập nhật giao diện ngay lập tức)
+      const oldUsers = [...users];
+      setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
+
+      try {
+          await updateUserRole(userId, newRole);
+          // Không cần alert làm phiền nếu thành công, chỉ log
+          console.log(`Updated user ${userId} to role ${newRole}`);
+      } catch (err) {
+          alert('Lỗi khi cập nhật quyền. Đang hoàn tác...');
+          setUsers(oldUsers); // Revert lại nếu lỗi
+      }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return (
-          <span className="flex items-center text-green-600 text-sm font-medium">
-            <CheckCircle size={16} className="mr-1" /> Active
-          </span>
-        );
+        return <span className="flex items-center text-green-600 text-sm font-medium"><CheckCircle size={16} className="mr-1" /> Active</span>;
       case 'pending':
-        return (
-          <span className="flex items-center text-yellow-600 text-sm font-medium">
-            <ShieldAlert size={16} className="mr-1" /> Chờ duyệt
-          </span>
-        );
+        return <span className="flex items-center text-yellow-600 text-sm font-medium"><ShieldAlert size={16} className="mr-1" /> Chờ duyệt</span>;
       case 'locked':
-        return (
-          <span className="flex items-center text-red-600 text-sm font-medium">
-            <XCircle size={16} className="mr-1" /> Locked
-          </span>
-        );
+        return <span className="flex items-center text-red-600 text-sm font-medium"><XCircle size={16} className="mr-1" /> Locked</span>;
       default:
         return status;
     }
@@ -138,9 +137,9 @@ const AdminUserPage: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <Shield className="text-blue-600" />
-            Quản trị User
+            Confirm Users Admin Panel
           </h1>
-          <p className="text-gray-500 mt-1">Quản lý danh sách nhân viên và phân quyền truy cập</p>
+          <p className="text-gray-500 mt-1">Quản lý nhân viên, phân quyền và trạng thái hoạt động</p>
         </div>
         <button 
             onClick={loadUsers}
@@ -166,9 +165,7 @@ const AdminUserPage: React.FC = () => {
           <tbody className="bg-white divide-y divide-gray-200">
             {users.map((user) => (
               <tr key={user.id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  #{user.id}
-                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">#{user.id}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex flex-col">
                     <span className="text-sm font-medium text-gray-900">{user.display_name || 'No Name'}</span>
@@ -176,12 +173,25 @@ const AdminUserPage: React.FC = () => {
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                   {/* Hiển thị bộ phận, nếu không có thì hiện gạch ngang */}
                    {user.department || '-'}
                 </td>
+                
+                {/* --- [THAY ĐỔI] Cột Role chuyển thành Dropdown --- */}
                 <td className="px-6 py-4 whitespace-nowrap">
-                  {getRoleBadge(user.role)}
+                    <select
+                        value={user.role}
+                        onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                        className={`block w-full py-1 px-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm font-medium
+                            ${user.role === 'admin' ? 'text-purple-700 bg-purple-50' : 
+                              user.role === 'sub_admin' ? 'text-blue-700 bg-blue-50' : 'text-gray-700'}
+                        `}
+                    >
+                        <option value="user">User</option>
+                        <option value="sub_admin">Sub Admin</option>
+                        <option value="admin">Admin</option>
+                    </select>
                 </td>
+
                 <td className="px-6 py-4 whitespace-nowrap">
                   {getStatusBadge(user.status)}
                 </td>
@@ -191,39 +201,28 @@ const AdminUserPage: React.FC = () => {
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end space-x-3">
                     
-                    {/* Nút Approve (Chỉ hiện khi pending) */}
                     {user.status === 'pending' && (
-                      <button 
-                        onClick={() => handleApprove(user.id)}
-                        className="text-green-600 hover:text-green-900 flex items-center"
-                        title="Duyệt tài khoản"
-                      >
+                      <button onClick={() => handleApprove(user.id)} className="text-green-600 hover:text-green-900" title="Duyệt">
                         <UserCheck size={18} />
                       </button>
                     )}
 
-                    {/* Nút Reset Password (Mới thêm) */}
-                    <button 
-                        onClick={() => handleResetPassword(user.id, user.display_name)}
-                        className="text-orange-500 hover:text-orange-700 flex items-center"
-                        title="Reset mật khẩu về 123456"
-                    >
+                    <button onClick={() => handleResetPassword(user.id, user.display_name)} className="text-orange-500 hover:text-orange-700" title="Reset Pass">
                         <RotateCcw size={18} />
                     </button>
 
-                    {/* Nút Khóa (Hiện khi active) */}
                     {user.status === 'active' && user.role !== 'admin' && (
-                      <button 
-                        onClick={() => handleLock(user.id)}
-                        className="text-yellow-600 hover:text-yellow-900 flex items-center"
-                        title="Khóa tài khoản"
-                      >
+                      <button onClick={() => handleLock(user.id)} className="text-yellow-600 hover:text-yellow-900" title="Khóa">
                         <UserX size={18} />
                       </button>
                     )}
 
-                    {/* Nút Xóa (Demo) */}
-                    <button className="text-gray-400 hover:text-red-600 transition-colors" title="Xóa vĩnh viễn">
+                    {/* --- [THAY ĐỔI] Nút Xóa đã có logic --- */}
+                    <button 
+                        onClick={() => handleDelete(user.id, user.display_name)}
+                        className="text-gray-400 hover:text-red-600 transition-colors" 
+                        title="Xóa vĩnh viễn"
+                    >
                       <Trash2 size={18} />
                     </button>
 

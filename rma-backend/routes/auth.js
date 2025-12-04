@@ -217,4 +217,44 @@ router.put('/users/:id/reset-password', async (req, res) => {
     }
 });
 
+// Frontend gọi: PUT /api/users/:id/role
+router.put('/users/:id/role', async (req, res) => {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    // Kiểm tra role hợp lệ
+    const validRoles = ['user', 'admin', 'sub_admin'];
+    if (!validRoles.includes(role)) {
+        return res.status(400).json({ message: 'Quyền không hợp lệ.' });
+    }
+
+    try {
+        await pool.query('UPDATE users SET role = ? WHERE id = ?', [role, id]);
+        res.json({ message: `Đã cập nhật quyền thành: ${role}` });
+    } catch (err) {
+        console.error("Lỗi update role:", err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// [CẬP NHẬT] API: Xóa user
+// Frontend gọi: DELETE /api/users/:id
+router.delete('/users/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        // Kiểm tra xem user có tồn tại không
+        const [check] = await pool.query('SELECT id FROM users WHERE id = ?', [id]);
+        if (check.length === 0) {
+            return res.status(404).json({ message: 'User không tồn tại' });
+        }
+
+        // Thực hiện xóa
+        await pool.query('DELETE FROM users WHERE id = ?', [id]);
+        res.json({ message: 'Đã xóa người dùng thành công' });
+    } catch (err) {
+        console.error("Lỗi xóa user:", err);
+        res.status(500).json({ message: 'Lỗi server khi xóa user. Có thể do ràng buộc dữ liệu.' });
+    }
+});
+
 module.exports = router;

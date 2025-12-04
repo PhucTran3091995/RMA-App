@@ -14,6 +14,7 @@ export type RmaStatus = "IN" | "OUT" | "Processing" | string;
 export interface ChartData {
     date: string;
     count: number;
+    cost: number | string;
 }
 
 export interface DistributionData {
@@ -144,6 +145,13 @@ export const updateUserStatus = async (id: number, status: string) => {
     const response = await api.put(`/users/${id}/status`, { status });
     return response.data;
 };
+
+// Thêm Interface cho kết quả Import
+export interface ImportResult {
+    success: boolean;
+    message: string;
+    logs: string[]; // Mảng chứa các dòng log chi tiết (VD: "Row 10: Updated...", "Row 12: Item not found")
+}
 // Dashboard
 
 export async function getRmaStats() {
@@ -205,3 +213,32 @@ export const fetchDashboardStats = async (buyer?: string) => {
     });
     return response.data;
 };
+
+// --- [ĐÃ SỬA] Hàm xóa user (Dùng api axios thay vì fetch) ---
+export const deleteUser = async (id: number) => {
+    const response = await api.delete(`/users/${id}`);
+    return response.data;
+};
+
+// --- [ĐÃ SỬA] Hàm cập nhật Role (Dùng api axios thay vì fetch) ---
+export const updateUserRole = async (id: number, role: string) => {
+    const response = await api.put(`/users/${id}/role`, { role });
+    return response.data;
+};
+
+// --- API Import Item Cost ---
+export const importItemCosts = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    // SỬA: Đổi '/items/import-costs' thành '/masters/import-costs'
+    // Vì trong index.js bạn khai báo là app.use('/api/masters', ...)
+    const response = await api.post('/masters/import-costs', formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+    });
+    return response.data; // Bỏ 'as ImportResult' nếu bạn chưa định nghĩa interface này
+};
+
+

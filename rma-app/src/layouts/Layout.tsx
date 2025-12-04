@@ -36,14 +36,14 @@ const Layout: React.FC = () => {
     // 2. RMA List: Ai cũng xem được
     { 
       path: '/rmas', 
-      label: 'RMA list', 
+      label: 'Danh sách hàng RMA', 
       icon: ClipboardList, 
       roles: ['admin', 'sub_admin', 'user'] 
     },
     // 3. Loans: Ai cũng xem được (nhưng quyền sửa xóa sẽ chặn bên trong trang)
     { 
       path: '/loans', 
-      label: 'Loans', 
+      label: 'Loans - Mượn/ Trả hàng', 
       icon: ArrowRightLeft, 
       roles: ['admin', 'sub_admin', 'user'] 
     },
@@ -57,14 +57,14 @@ const Layout: React.FC = () => {
     // 5. Master Data: Chỉ Admin và SubAdmin
     { 
       path: '/master-data', 
-      label: 'Master Data', 
+      label: 'Upload - Cost', 
       icon: Database, 
       roles: ['admin', 'sub_admin'] 
     },
     // 6. Quản trị User: CHỈ ADMIN
     { 
       path: '/users', 
-      label: 'Quản trị User', 
+      label: 'Admin Panel', 
       icon: Users, 
       roles: ['admin'] 
     },

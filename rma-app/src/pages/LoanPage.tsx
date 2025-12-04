@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
-    User, Briefcase, CheckCircle, XCircle, Trash2, 
-    FileSpreadsheet, Save, ArrowRightLeft, ChevronLeft, ChevronRight,
-    Scan, PackageOpen, ClipboardList
+    User, Briefcase, CheckCircle, Trash2, 
+    FileSpreadsheet, ArrowRightLeft, ChevronLeft, ChevronRight,
+    Scan, PackageOpen, ClipboardList, IdCard
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { validateRmaSerials } from '../api/rmaApi';
@@ -33,12 +33,49 @@ const LoanPage: React.FC = () => {
     const [scannedReturnPids, setScannedReturnPids] = useState<string[]>([]);
     const [returnPage, setReturnPage] = useState(1);
 
-    // Logic Functions (Giữ nguyên logic cũ)
-    const handleCheckEmployee = async () => {
-        if (!empCode) return;
-        try { const data = await getEmployeeByCode(empCode); setEmployee(data); } 
-        catch { setEmployee(null); alert('Employee not found'); }
-    };
+    // --- Logic tự động lấy user đang đăng nhập (ĐÃ SỬA LỖI) ---
+    useEffect(() => {
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+            try {
+                const parsedData = JSON.parse(userStr);
+                
+                // Hỗ trợ cả 2 trường hợp: User nằm ở root hoặc nằm trong property .user
+                const currentUser = parsedData.user || parsedData;
+
+                if (currentUser && currentUser.employee_no) {
+                    const myId = currentUser.employee_no;
+                    setEmpCode(myId);
+
+                    // 1. Hiển thị ngay thông tin từ LocalStorage (để UI không bị trống)
+                    setEmployee({
+                        id: currentUser.id,
+                        code: currentUser.employee_no,
+                        name: currentUser.name || currentUser.display_name || "Unknown",
+                        // Nếu chưa có tên phòng ban thì hiển thị ID hoặc placeholder
+                        department_name: currentUser.department_id ? `Dept ID: ${currentUser.department_id}` : "Loading..." 
+                    });
+
+                    // 2. Gọi API để lấy thông tin chi tiết nhất (tên phòng ban chính xác)
+                    getEmployeeByCode(String(myId))
+                        .then(data => {
+                            if (data) {
+                                setEmployee(prev => ({
+                                    ...prev!,
+                                    ...data // Cập nhật thông tin mới nhất từ database
+                                }));
+                            }
+                        })
+                        .catch(err => {
+                            // Chỉ log lỗi nếu thực sự cần thiết
+                            console.error("Failed to fetch fresh employee info:", err);
+                        });
+                }
+            } catch (e) {
+                console.error("Error parsing user info:", e);
+            }
+        }
+    }, []);
 
     const checkBorrowPidLogic = (pid: string, rmaData: any) => {
         if (!rmaData) return { status: 'NG', note: 'PID Not Found' };
@@ -86,7 +123,7 @@ const LoanPage: React.FC = () => {
     };
 
     const handleSubmitBorrow = async () => {
-        if (!employee) return alert('Please select an employee');
+        if (!employee) return alert('Employee info is missing. Please re-login.');
         if (!reason) return alert('Please enter a reason');
         const validItems = borrowList.filter(i => i.status === 'OK');
         if (validItems.length === 0) return alert('No valid (OK) items to borrow');
@@ -99,6 +136,7 @@ const LoanPage: React.FC = () => {
         } catch { alert('Failed to submit borrow request'); }
     };
 
+    // Return Logic
     const handleCheckReturnEmployee = async () => {
         if (!returnEmpCode) return;
         try { const loans = await getActiveLoans(returnEmpCode); setActiveLoans(loans); setScannedReturnPids([]); setReturnPage(1); } 
@@ -123,7 +161,6 @@ const LoanPage: React.FC = () => {
         catch { alert('Error processing return'); }
     };
 
-    // Helper Pagination
     const getPaginatedData = <T,>(data: T[], page: number) => {
         const start = (page - 1) * itemsPerPage;
         return { currentItems: data.slice(start, start + itemsPerPage), totalPages: Math.ceil(data.length / itemsPerPage) };
@@ -154,7 +191,6 @@ const LoanPage: React.FC = () => {
                     <p className="text-slate-500">Quản lý mượn trả vỉ lỗi (Borrow / Return PCBs)</p>
                 </div>
                 
-                {/* Modern Segmented Control */}
                 <div className="bg-slate-100 p-1.5 rounded-xl inline-flex shadow-inner">
                     <button onClick={() => setActiveTab('borrow')}
                         className={clsx("px-6 py-2 rounded-lg text-sm font-bold flex items-center transition-all", activeTab === 'borrow' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}>
@@ -172,21 +208,36 @@ const LoanPage: React.FC = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Left Column: Controls */}
                     <div className="lg:col-span-1 space-y-6">
-                        {/* Employee Card */}
+                        
+                        {/* CARD THÔNG TIN NGƯỜI MƯỢN */}
                         <div className="bg-white p-5 rounded-2xl shadow-lg shadow-indigo-100/50 border border-slate-100">
                             <h3 className="font-bold text-slate-800 mb-4 flex items-center"><User className="w-5 h-5 mr-2 text-indigo-500"/> Borrower Info</h3>
                             <div className="space-y-4">
-                                <div className="flex gap-2">
-                                    <input type="text" value={empCode} onChange={(e) => setEmpCode(e.target.value)} onBlur={handleCheckEmployee}
-                                        className="flex-1 px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" placeholder="ID (e.g. V1234)" />
-                                    <button onClick={handleCheckEmployee} className="px-3 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 font-medium">Check</button>
-                                </div>
-                                {employee && (
-                                    <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-100 text-sm space-y-1 animate-fade-in">
-                                        <p className="font-bold text-indigo-900">{employee.name}</p>
-                                        <p className="text-indigo-700 flex items-center"><Briefcase className="w-3 h-3 mr-1"/> {employee.department_name}</p>
+                                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 space-y-3">
+                                    <div className="flex items-center justify-between border-b border-indigo-200 pb-2">
+                                        <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">Employee ID</span>
+                                        <div className="flex items-center font-mono font-bold text-indigo-700">
+                                            <IdCard className="w-4 h-4 mr-1.5" />
+                                            {empCode || "Loading..."}
+                                        </div>
                                     </div>
-                                )}
+                                    
+                                    <div>
+                                        <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider block mb-1">Full Name</span>
+                                        <p className="font-bold text-slate-700 text-lg">
+                                            {employee ? employee.name : "..."}
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider block mb-1">Department</span>
+                                        <p className="text-sm font-medium text-slate-600 flex items-center">
+                                            <Briefcase className="w-3.5 h-3.5 mr-1.5" /> 
+                                            {employee ? employee.department_name : "..."}
+                                        </p>
+                                    </div>
+                                </div>
+
                                 <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3}
                                     className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 transition-all resize-none" placeholder="Lý do mượn hàng (Reason for borrowing)..." />
                             </div>

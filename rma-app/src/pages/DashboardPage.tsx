@@ -53,6 +53,7 @@ const getSmoothPath = (points: {x: number, y: number}[]) => {
     return d;
 };
 
+
 // --- Component: MiniTrendChart ---
 const MiniTrendChart = ({ title, subTitle, data, colorClass, icon: Icon }: { title: string, subTitle: string, data: ChartData[], colorClass: string, icon: any }) => {
     const maxValue = Math.max(...data.map(d => d.count), 5) * 1.15; 
@@ -61,6 +62,18 @@ const MiniTrendChart = ({ title, subTitle, data, colorClass, icon: Icon }: { tit
         x: ((i + 0.5) / data.length) * 100,
         y: 100 - ((d.count / maxValue) * 100)
     }));
+
+const formatCurrencyCompact = (amount: number | string) => { // Chấp nhận cả string
+    const num = Number(amount); // Ép kiểu sang số an toàn
+    if (isNaN(num)) return '$0'; // Nếu lỗi thì trả về $0
+    
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        notation: 'compact',
+        maximumFractionDigits: 1
+    }).format(num);
+};
 
     const smoothPathD = getSmoothPath(chartCoordinates);
 
@@ -106,8 +119,15 @@ const MiniTrendChart = ({ title, subTitle, data, colorClass, icon: Icon }: { tit
                             const heightPercentage = maxValue ? (item.count / maxValue) * 100 : 0;
                             return (
                                 <div key={index} className="flex-1 flex flex-col items-center justify-end h-full group relative">
-                                    <div className={`mb-1 text-[11px] font-bold ${colorClass}`}>
-                                        {item.count}
+                                    <div className={`mb-1 flex flex-col items-center justify-center transition-transform transform group-hover:-translate-y-1`}>
+                                        {/* Số lượng */}
+                                        <span className={`text-[11px] font-bold ${colorClass}`}>
+                                            {item.count}
+                                        </span>
+                                        {/* Giá tiền - Sửa dòng dưới đây */}
+                                        <span className="text-[9px] text-gray-500 font-medium bg-white/80 px-1 rounded-sm border border-gray-100 shadow-sm whitespace-nowrap">
+                                        {formatCurrencyCompact(item.cost)}
+                                        </span>
                                     </div>
                                     <div 
                                         className={`w-2/3 max-w-[20px] rounded-t-sm opacity-20 hover:opacity-40 transition-all duration-300 cursor-pointer ${colorClass.replace('text-', 'bg-')}`}
@@ -146,39 +166,39 @@ const BuyerBreakdownCard = ({ data }: { data: BuyerDistribution[] }) => {
 
     return (
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 h-full hover:shadow-md transition-shadow flex flex-col">
+            {/* --- THAY ĐỔI: Đưa Dropdown lên header --- */}
             <div className="flex items-center justify-between mb-4 border-b pb-2">
                 <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                     <div className="p-1.5 bg-gray-100 rounded-md">
                         <Layers className="w-4 h-4 text-blue-600" />
                     </div>
-                    Buyer Breakdown
+                    Buyer
                 </h3>
-            </div>
 
-            {/* Dropdown Box */}
-            <div className="mb-6">
-                 <label htmlFor="buyer-select" className="block mb-2 text-sm font-medium text-gray-900">Select Buyer:</label>
-                 <select 
+                {/* --- THAY ĐỔI: Combo box nhỏ gọn, nằm góc phải --- */}
+                <select 
                     id="buyer-select"
                     value={selectedBuyer}
                     onChange={(e) => setSelectedBuyer(e.target.value)}
-                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                 >
+                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-md focus:ring-blue-500 focus:border-blue-500 block p-1.5"
+                    style={{ maxWidth: '180px' }} // Giới hạn chiều rộng
+                >
                     {data.length === 0 && <option value="">No data</option>}
                     {data.map((item) => (
                         <option key={item.buyer} value={item.buyer}>
-                            {item.buyer} ({item.total} EA)
+                            {item.buyer} {/* --- THAY ĐỔI: Bỏ hiển thị số lượng (EA) --- */}
                         </option>
                     ))}
-                 </select>
+                </select>
             </div>
 
+            {/* Phần hiển thị nội dung bên dưới giữ nguyên logic cũ */}
             <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar">
                 {!currentData ? (
                     <p className="text-gray-400 text-sm text-center italic py-4">No data available</p>
                 ) : (
                     <div className="bg-gray-50 rounded-xl p-5 border border-gray-100 shadow-sm animate-fade-in">
-                        {/* --- HEADER BUYER INFO --- */}
+                        {/* HEADER BUYER INFO */}
                         <div className="flex justify-between items-center mb-2">
                             <div className="flex items-center gap-2">
                                 <UsersIcon className="w-6 h-6 text-blue-600" />
@@ -189,7 +209,7 @@ const BuyerBreakdownCard = ({ data }: { data: BuyerDistribution[] }) => {
                             </span>
                         </div>
                         
-                        {/* Thanh Progress bar tổng (So với Global Max) */}
+                        {/* Thanh Scale */}
                         <div className="flex items-center gap-2 mb-6">
                             <span className="text-[10px] text-gray-400 w-12 text-right">Scale</span>
                             <div className="w-full bg-gray-200 rounded-full h-2">
@@ -200,17 +220,14 @@ const BuyerBreakdownCard = ({ data }: { data: BuyerDistribution[] }) => {
                             </div>
                         </div>
 
-                        {/* --- LIST MODELS (CHI TIẾT) --- */}
+                        {/* LIST MODELS */}
                         <h4 className="text-sm font-semibold text-gray-700 mb-3 border-b border-gray-200 pb-1">Model Breakdown</h4>
                         <div className="space-y-4">
                             {currentData.models.map((model, mIdx) => (
                                 <div key={mIdx} className="flex items-center gap-3 group">
-                                    {/* Tên Model */}
                                     <div className="w-28 min-w-[7rem] text-sm font-medium text-gray-600 truncate text-right group-hover:text-blue-600 transition-colors">
                                         {model.model}
                                     </div>
-
-                                    {/* Thanh Bar của Model (So với Tổng của Buyer này) */}
                                     <div className="flex-grow">
                                         <div className="flex justify-between text-[11px] text-gray-500 mb-0.5">
                                             <span></span>
@@ -303,6 +320,7 @@ const DashboardPage: React.FC = () => {
                 setStats(statsData);
                 setDistributions(distRes);
                 setTrends(trendRes);
+                console.log("Dữ liệu Trend từ Server:", trendRes);
 
             } catch (error) {
                 console.error('Failed to fetch dashboard data', error);
@@ -313,6 +331,8 @@ const DashboardPage: React.FC = () => {
 
         fetchData();
     }, []);
+
+
 
     const StatCard = ({ title, value, icon: Icon, color, onClick }: any) => (
         <div
@@ -385,7 +405,7 @@ const DashboardPage: React.FC = () => {
             {/* Distributions Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Bảng Buyer gộp Model (Đã thu gọn bằng Dropdown) */}
-                <div className="lg:col-span-2">
+                <div className="lg:col-span-1">
                     <BuyerBreakdownCard data={distributions.buyerBreakdown || []} />
                 </div>
 

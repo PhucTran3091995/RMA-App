@@ -185,7 +185,8 @@ router.get('/trends-breakdown', async (req, res) => {
         const [monthly] = await pool.query(`
             SELECT 
                 DATE_FORMAT(rma_date, '%Y-%m') as date,
-                COUNT(*) as count
+                COUNT(*) as count,
+                COALESCE(SUM(item_cost_usd), 0) as cost
             FROM rma_boards
             WHERE status_actual = 'Processing'
               AND rma_date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)
@@ -194,11 +195,11 @@ router.get('/trends-breakdown', async (req, res) => {
         `);
 
         // 2. Trend Tuần (4 tuần gần nhất)
-        // FIX ERROR 1055: Dùng MAX() bao quanh cột hiển thị để thỏa mãn only_full_group_by
         const [weekly] = await pool.query(`
             SELECT 
                 MAX(CONCAT('W', DATE_FORMAT(rma_date, '%v'))) as date,
-                COUNT(*) as count
+                COUNT(*) as count,
+                COALESCE(SUM(item_cost_usd), 0) as cost
             FROM rma_boards
             WHERE status_actual = 'Processing'
               AND rma_date >= DATE_SUB(CURDATE(), INTERVAL 4 WEEK)
@@ -210,7 +211,8 @@ router.get('/trends-breakdown', async (req, res) => {
         const [daily] = await pool.query(`
             SELECT 
                 DATE_FORMAT(rma_date, '%Y-%m-%d') as date,
-                COUNT(*) as count
+                COUNT(*) as count,
+                COALESCE(SUM(item_cost_usd), 0) as cost
             FROM rma_boards
             WHERE status_actual = 'Processing'
               AND rma_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)

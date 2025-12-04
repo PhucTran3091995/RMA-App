@@ -1,10 +1,17 @@
 ﻿import axios from "axios";
 
 // Backend URL
-const api = axios.create({
-    baseURL: "http://localhost:3000/api",
-});
+// Bước 1: Lấy link từ biến môi trường (trên Vercel).
+// Nếu không có (khi chạy ở nhà) thì dùng localhost (Lưu ý sửa port 3000 hay 5000 cho đúng máy bạn)
+const baseURL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 
+// Bước 2: Tạo axios với link động đó
+const api = axios.create({
+    baseURL: baseURL,
+    headers: {
+        "Content-Type": "application/json",
+    },
+});
 // ======================================
 // Types (giống schema backend trả về)
 // ======================================
